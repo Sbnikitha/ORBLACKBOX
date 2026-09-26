@@ -14,7 +14,7 @@ import json
 import sys
 import urllib.request
 
-URL = "http://127.0.0.1:8000/v1/chat/completions"
+URL = "http://100.81.221.41:8000/v1/chat/completions"
 MODEL = "Inferact/Qwen3.8-27B-NVFP4"
 
 

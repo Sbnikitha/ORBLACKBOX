@@ -9,6 +9,7 @@ import config
 import local_model
 
 LAST = {"backend": "edge-local", "ms": 0.0}
+_REMOTE_DOWN = False
 
 
 def _extract_json(text):
@@ -52,8 +53,9 @@ def _remote_chat(url, model, system, user, max_tokens=200):
 def process_line(text):
     """Run Counter and Checklist on one line of speech."""
     started = time.perf_counter()
+    global _REMOTE_DOWN
     backend = "edge-local"
-    if config.LLM_URL.startswith("http"):
+    if config.LLM_URL.startswith("http") and not _REMOTE_DOWN:
         try:
             from concurrent.futures import ThreadPoolExecutor
             counter_prompt = (
@@ -75,6 +77,7 @@ def process_line(text):
             LAST.update(backend="zrt", ms=round((time.perf_counter() - started) * 1000, 1))
             return counts, {"event": event, "detail": raw_k.get("detail", "") or ""}
         except (urllib.error.URLError, TimeoutError, OSError, KeyError, json.JSONDecodeError):
+            _REMOTE_DOWN = True
             if not config.ALLOW_FALLBACK:
                 raise
             backend = "edge-local-fallback"
@@ -85,7 +88,8 @@ def process_line(text):
 
 
 def critic(state, status, alerts):
-    if config.LLM_URL.startswith("http"):
+    global _REMOTE_DOWN
+    if config.LLM_URL.startswith("http") and not _REMOTE_DOWN:
         try:
             raw = _extract_json(_remote_chat(
                 config.LLM_URL, config.LLM_MODEL,
@@ -96,13 +100,15 @@ def critic(state, status, alerts):
             if raw.get("message"):
                 return raw["message"]
         except (urllib.error.URLError, TimeoutError, OSError, KeyError, json.JSONDecodeError):
+            _REMOTE_DOWN = True
             if not config.ALLOW_FALLBACK:
                 raise
     return local_model.critic(state, status, alerts)
 
 
 def scribe(events, state=None):
-    if config.LLM_URL.startswith("http"):
+    global _REMOTE_DOWN
+    if config.LLM_URL.startswith("http") and not _REMOTE_DOWN:
         try:
             text = _remote_chat(
                 config.LLM_URL, config.LLM_MODEL,
@@ -112,13 +118,15 @@ def scribe(events, state=None):
             )
             return re.sub(r"<think>.*?</think>", "", text or "", flags=re.S).strip()
         except (urllib.error.URLError, TimeoutError, OSError, KeyError, json.JSONDecodeError):
+            _REMOTE_DOWN = True
             if not config.ALLOW_FALLBACK:
                 raise
     return local_model.scribe(events, state)
 
 
 def ask_protocol(question):
-    if config.LLM_URL.startswith("http"):
+    global _REMOTE_DOWN
+    if config.LLM_URL.startswith("http") and not _REMOTE_DOWN:
         try:
             raw = _extract_json(_remote_chat(
                 config.LLM_URL, config.LLM_MODEL,
@@ -129,6 +137,7 @@ def ask_protocol(question):
             conf = float(raw.get("confidence", 0))
             return {"answer": raw.get("answer", ""), "confidence": max(0.0, min(conf, 1.0)), "backend": "zrt"}
         except (urllib.error.URLError, TimeoutError, OSError, KeyError, json.JSONDecodeError, TypeError, ValueError):
+            _REMOTE_DOWN = True
             if not config.ALLOW_FALLBACK:
                 raise
     result = local_model.protocol(question)

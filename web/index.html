@@ -6,9 +6,9 @@
 <title>OR Sentinel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="/static/styles.css?v=10" />
+<link rel="stylesheet" href="/static/styles.css?v=30" />
 </head>
-<body>
+<body class="on-floor">
 <div class="atmosphere"></div>
 <header class="top">
   <div class="brand">
@@ -20,18 +20,20 @@
   </div>
   <div class="ecg" aria-hidden="true"><svg viewBox="0 0 240 36" preserveAspectRatio="none"><polyline points="0,18 30,18 40,18 48,8 56,28 64,14 72,18 110,18 120,18 128,6 136,30 144,12 152,18 240,18"/></svg></div>
   <div class="specs">
-    <span><b>TARGET</b> HP ZGX Nano · GB10</span>
-    <span><b>STATION</b> <em id="station">edge models</em></span>
+    <div id="modelLamps" class="lamps"></div>
     <span id="clock">--:--:--</span>
   </div>
-  <div id="integrity" class="seal">RECORD</div>
 </header>
+
+<div id="hostSwitch" class="host-switch" role="group" aria-label="Inference box"></div>
 
 <section id="metrics" class="metrics"></section>
 
 <nav class="tabs">
   <button class="tab on" data-tab="floor">Floor</button>
-  <button class="tab" data-tab="live">Live + Black Box</button>
+  <button class="tab" data-tab="live" data-pictures="synthetic">Synthetic Live</button>
+  <button class="tab" data-tab="live" data-pictures="demo">Synthetic demo</button>
+  <button class="tab" data-tab="real">Real demo</button>
   <button class="tab" data-tab="privacy">Privacy</button>
   <button class="tab" data-tab="ledger">Ledger</button>
   <button class="tab" data-tab="evidence">Evidence</button>
@@ -48,8 +50,8 @@
 
   <section id="live" class="view hidden">
     <div class="panel" id="caseSetup">
-      <h2>Start a live case</h2>
-      <p>Pick the procedure and what this case should test. The checklist and the black box start when you press go. Speech is paced with the room. The finished case appears on the floor as the room you choose.</p>
+      <h2 id="liveTitle">Synthetic Live</h2>
+      <p id="liveBlurb">Drawn tray photos and the black box. Pick the procedure, then start. Speech follows the room.</p>
       <p class="sub">Procedure</p>
       <div class="pick-grid" id="procedures">
         <button type="button" class="pick on" data-procedure="appendectomy"><b>Appendectomy</b><span>Laparoscopic · right side</span></button>
@@ -120,79 +122,183 @@
     </div>
   </section>
 
+  <section id="real" class="view hidden">
+    <div class="panel">
+      <h2>Real demo</h2>
+      <p>Image detection only. No procedure. The detector is <b id="detectHost">100.81.221.41:8002</b>. Pick a real tray.</p>
+      <div class="stage" id="detectStage"></div>
+      <div id="detectRead" class="analysis">Waiting for a photo.</div>
+      <div class="film" id="detectFilm"></div>
+    </div>
+  </section>
+
   <section id="architecture" class="view hidden">
     <div class="panel">
-      <h2>Inference stays on one HP ZGX Nano</h2>
-      <p>ZRT serves both models on the Nano. The 27B reads the room. The vision model reads the tray. Fixed rules decide the close. The cloud only sees an anonymous protocol question, and only when the local model is unsure.</p>
+      <h2>What goes in, and what comes out</h2>
+      <p>Speech and the tray photo stay on <b id="archHost">100.81.221.41</b>. Each model has its own port. None of them choose the close. The rules engine is the only step that can say SAFE, CAUTION, or BLOCK.</p>
       <div class="arch-wrap">
-        <svg class="arch" viewBox="0 0 980 520" role="img" aria-label="OR Sentinel flow on HP ZRT Nano">
+        <svg class="arch" viewBox="0 0 1080 420" role="img" aria-label="OR Sentinel flow">
           <defs>
-            <linearGradient id="nano" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#12382f"/>
-              <stop offset="1" stop-color="#071610"/>
-            </linearGradient>
-            <filter id="glow"><feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#3ee0a2" flood-opacity=".35"/></filter>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#3ee0a2"/>
+            </marker>
           </defs>
-          <rect x="210" y="70" width="560" height="390" rx="28" fill="url(#nano)" stroke="#3ee0a2" stroke-width="2"/>
-          <text x="490" y="108" text-anchor="middle" class="arch-title">HP ZGX Nano · GB10</text>
-          <text x="490" y="132" text-anchor="middle" class="arch-sub">ZRT · both models served on this box</text>
-
           <g class="node">
-            <rect x="40" y="40" width="150" height="64" rx="12"/>
-            <text x="115" y="66" text-anchor="middle">OR microphone</text>
-            <text x="115" y="86" text-anchor="middle" class="arch-sub">whole procedure</text>
+            <rect x="16" y="36" width="150" height="64" rx="12"/>
+            <text x="91" y="62" text-anchor="middle">Microphone</text>
+            <text x="91" y="80" text-anchor="middle" class="arch-sub">room audio</text>
           </g>
           <g class="node">
-            <rect x="40" y="400" width="150" height="64" rx="12"/>
-            <text x="115" y="426" text-anchor="middle">Tray camera</text>
-            <text x="115" y="446" text-anchor="middle" class="arch-sub">sponges and tools</text>
-          </g>
-
-          <path class="flow a" d="M190 72 C 230 72, 250 160, 280 180"/>
-          <path class="flow b" d="M190 432 C 240 432, 250 360, 280 340"/>
-
-          <g class="node zrt" filter="url(#glow)">
-            <rect x="280" y="155" width="200" height="90" rx="14"/>
-            <text x="380" y="188" text-anchor="middle">ZRT :8000</text>
-            <text x="380" y="212" text-anchor="middle" class="arch-sub">27B NVFP4</text>
-            <text x="380" y="230" text-anchor="middle" class="arch-sub">Counter · Checklist · Critic</text>
+            <rect x="230" y="36" width="150" height="64" rx="12"/>
+            <text x="305" y="62" text-anchor="middle">Whisper</text>
+            <text x="305" y="80" text-anchor="middle" class="arch-sub">words</text>
           </g>
           <g class="node zrt">
-            <rect x="280" y="290" width="200" height="78" rx="14"/>
-            <text x="380" y="322" text-anchor="middle">ZRT :8001</text>
-            <text x="380" y="346" text-anchor="middle" class="arch-sub">Vision · tray labels</text>
+            <rect x="444" y="28" width="180" height="80" rx="12"/>
+            <text x="534" y="58" text-anchor="middle">Counter</text>
+            <text x="534" y="78" text-anchor="middle" class="arch-sub">:8000 added / removed</text>
           </g>
-
-          <path class="flow c" d="M480 200 H 560"/>
-          <path class="flow d" d="M480 330 H 560"/>
-
           <g class="node">
-            <rect x="560" y="210" width="180" height="100" rx="14"/>
-            <text x="650" y="248" text-anchor="middle">Rules engine</text>
-            <text x="650" y="272" text-anchor="middle" class="arch-sub">SAFE · CAUTION · BLOCK</text>
-            <text x="650" y="292" text-anchor="middle" class="arch-sub">not the model</text>
+            <rect x="16" y="250" width="150" height="64" rx="12"/>
+            <text x="91" y="276" text-anchor="middle">Tray camera</text>
+            <text x="91" y="294" text-anchor="middle" class="arch-sub">one photo</text>
           </g>
-
-          <path class="flow e" d="M740 260 H 820"/>
+          <g class="node zrt">
+            <rect x="230" y="236" width="180" height="92" rx="12"/>
+            <text x="320" y="270" text-anchor="middle">Detector</text>
+            <text id="archDetect" x="320" y="290" text-anchor="middle" class="arch-sub">100.81.221.41:8002</text>
+            <text x="320" y="308" text-anchor="middle" class="arch-sub">boxes</text>
+          </g>
           <g class="node">
-            <rect x="820" y="214" width="130" height="92" rx="14"/>
-            <text x="885" y="252" text-anchor="middle">Black box</text>
-            <text x="885" y="274" text-anchor="middle" class="arch-sub">hash ledger</text>
-            <text x="885" y="292" text-anchor="middle" class="arch-sub">floor</text>
+            <rect x="700" y="140" width="160" height="100" rx="14"/>
+            <text x="780" y="178" text-anchor="middle">Rules</text>
+            <text x="780" y="198" text-anchor="middle" class="arch-sub">SAFE CAUTION BLOCK</text>
+            <text x="780" y="216" text-anchor="middle" class="arch-sub">not the model</text>
           </g>
-
-          <path class="flow cloud" d="M380 155 C 380 60, 700 40, 860 70"/>
-          <g class="node cloud">
-            <rect x="780" y="28" width="170" height="58" rx="14"/>
-            <text x="865" y="52" text-anchor="middle">Cloud</text>
-            <text x="865" y="70" text-anchor="middle" class="arch-sub">anonymous questions only</text>
+          <g class="node">
+            <rect x="910" y="150" width="150" height="80" rx="14"/>
+            <text x="985" y="184" text-anchor="middle">Black box</text>
+            <text x="985" y="204" text-anchor="middle" class="arch-sub">hash ledger</text>
           </g>
+          <path class="guide" d="M166 68 H230" marker-end="url(#arrow)"/>
+          <path class="guide" d="M380 68 H444" marker-end="url(#arrow)"/>
+          <path class="guide" d="M624 68 H700 V160" marker-end="url(#arrow)"/>
+          <path class="guide" d="M166 282 H230" marker-end="url(#arrow)"/>
+          <path class="guide" d="M410 282 H700 V220" marker-end="url(#arrow)"/>
+          <path class="guide" d="M860 190 H910" marker-end="url(#arrow)"/>
+          <circle r="5" fill="#3ee0a2"><animateMotion dur="1.8s" repeatCount="indefinite" path="M166 68 H230"/></circle>
+          <circle r="5" fill="#3ee0a2"><animateMotion dur="1.8s" begin="0.35s" repeatCount="indefinite" path="M380 68 H444"/></circle>
+          <circle r="5" fill="#3ee0a2"><animateMotion dur="2.2s" begin="0.7s" repeatCount="indefinite" path="M624 68 H700 V160"/></circle>
+          <circle r="5" fill="#7ee7ff"><animateMotion dur="1.8s" repeatCount="indefinite" path="M166 282 H230"/></circle>
+          <circle r="5" fill="#7ee7ff"><animateMotion dur="2.2s" begin="0.45s" repeatCount="indefinite" path="M410 282 H700 V220"/></circle>
+          <circle r="5" fill="#ffc14d"><animateMotion dur="1.4s" repeatCount="indefinite" path="M860 190 H910"/></circle>
         </svg>
       </div>
-      <div class="trio">
-        <article><h3>27B on ZRT</h3><p>One language model on port 8000 reads every spoken line for the whole operation: counts, checklist, critic, and the safety log.</p></article>
-        <article><h3>Vision on ZRT</h3><p>The fine-tuned vision model on port 8001 outlines sponges, instruments, and needles on the tray. It runs beside the 27B on the same Nano.</p></article>
-        <article><h3>Why the Nano</h3><p>ZRT batches eight rooms. Patient speech and images stay on the box. A protocol question leaves only after names and dates are removed.</p></article>
+      <div class="arch-cards">
+        <article>
+          <span class="tag">Speech · nano/weights/whisper/tiny.pt</span>
+          <h3>Whisper</h3>
+          <p><b>In</b> Room audio, one wav.</p>
+          <p><b>Out</b> The words on that line.</p>
+        </article>
+        <article>
+          <span class="tag">Language · Qwen3 27B · :8000</span>
+          <h3>Counter</h3>
+          <p><b>In</b> One spoken line from Whisper.</p>
+          <p><b>Out</b> Sponges added and sponges removed.</p>
+        </article>
+        <article>
+          <span class="tag">Language · Qwen3 27B · :8000</span>
+          <h3>Checklist</h3>
+          <p><b>In</b> The same spoken line.</p>
+          <p><b>Out</b> One event: time-out, patient, site, allergies, count confirmed, close, or none.</p>
+        </article>
+        <article>
+          <span class="tag">Detector · nano/weights/detector.pt</span>
+          <h3>Detector</h3>
+          <p><b>In</b> One tray photo.</p>
+          <p><b>Out</b> A box for each cotton piece, hand, and instrument.</p>
+        </article>
+        <article>
+          <span class="tag">CountNet · models/count.pt</span>
+          <h3>CountNet</h3>
+          <p><b>In</b> The same tray photo.</p>
+          <p><b>Out</b> One sponge count.</p>
+        </article>
+        <article>
+          <span class="tag">ToolNet · models/tool.pt</span>
+          <h3>ToolNet</h3>
+          <p><b>In</b> The same tray photo.</p>
+          <p><b>Out</b> One box around the instrument.</p>
+        </article>
+        <article>
+          <span class="tag">Vision · Qwen2.5-VL · :8001</span>
+          <h3>Qwen2.5-VL</h3>
+          <p><b>In</b> The tray photo and the question “how many sponges?”</p>
+          <p><b>Out</b> A number, or the instrument name.</p>
+        </article>
+        <article>
+          <span class="tag">Not a model</span>
+          <h3>Rules engine</h3>
+          <p><b>In</b> Added, removed, camera count, checklist, tools still inside, and whether someone asked to close.</p>
+          <p><b>Out</b> SAFE, CAUTION, or BLOCK.</p>
+        </article>
+        <article>
+          <span class="tag">Language · after the rules</span>
+          <h3>Critic</h3>
+          <p><b>In</b> The status and the alerts. It does not see the raw audio.</p>
+          <p><b>Out</b> One sentence for the nurse.</p>
+        </article>
+        <article>
+          <span class="tag">Language · after the rules</span>
+          <h3>Scribe</h3>
+          <p><b>In</b> The checklist events and the final counts.</p>
+          <p><b>Out</b> The safety log stored in the black box.</p>
+        </article>
+        <article>
+          <span class="tag">Privacy · Synthea</span>
+          <h3>Protocol desk</h3>
+          <p><b>In</b> A question. A Synthea chart is stripped of name, birth date, age, and record number first.</p>
+          <p><b>Out</b> An answer on the Nano, or the stripped text only if the link is up and the question is not urgent.</p>
+        </article>
+      </div>
+      <h3>Datasets this build uses</h3>
+      <div class="datasets">
+        <article>
+          <span class="tag">Privacy demo</span>
+          <h3>Synthea</h3>
+          <p>Fake patient records from the Synthea April 2020 sample, 1,171 charts. Each room and each Privacy chart button takes the next living record. The same name is not repeated until that table wraps. Name, birth date, age, and record number are removed before a question can leave the Nano.</p>
+        </article>
+        <article>
+          <span class="tag">Detector</span>
+          <h3>IGauze CZ and HOSPI-Tools</h3>
+          <p>IGauze tray photos are the background. HOSPI instrument cutouts sit under the cotton. The combined photos are <code>data/composites_real</code>, 7,201 train and 341 valid. That is what trained <code>nano/weights/detector.pt</code>.</p>
+        </article>
+        <article>
+          <span class="tag">CountNet</span>
+          <h3>Generated trays</h3>
+          <p>Sponge trays drawn by <code>app/photos.py</code>. CountNet learned the gauze color on those pictures. It did not train on IGauze.</p>
+        </article>
+        <article>
+          <span class="tag">ToolNet</span>
+          <h3>Kvasir-Instrument</h3>
+          <p>590 endoscope frames in <code>data/external/kvasir-instrument</code>. ToolNet trained on 501 and was tested on 89.</p>
+        </article>
+        <article>
+          <span class="tag">Vision fine-tune</span>
+          <h3>HOSPI-Tools</h3>
+          <p>The same hospital instrument photos feed <code>nano/prepare_zrt_data.py</code>. Qwen2.5-VL is pulled, not fine-tuned yet. The Nano script is <code>nano/train_on_nano.sh</code>.</p>
+        </article>
+        <article>
+          <span class="tag">Speech</span>
+          <h3>Acted lines and Whisper tiny</h3>
+          <p>The live procedure is a written script, spoken in the browser. Whisper tiny turns a wav into text. It was not trained on operating-room audio.</p>
+        </article>
+        <article>
+          <span class="tag">Language</span>
+          <h3>Qwen3 27B</h3>
+          <p>Pulled on the Nano as Inferact/Qwen3.8-27B-NVFP4. It is not fine-tuned. Counter, Checklist, Critic, and Scribe are roles on that one model, or the local stand-in when port 8000 is down.</p>
+        </article>
       </div>
     </div>
   </section>
@@ -229,7 +335,7 @@
   <section id="ledger" class="view hidden">
     <div class="panel">
       <h2>Hash-chained surgical record</h2>
-      <p>Each entry stores the fingerprint of the one before it. Forge a line and the chain names the broken entry. Reset starts a new genesis block.</p>
+      <p>Each entry stores the fingerprint of the one before it.</p>
       <div id="chain" class="chain"></div>
     </div>
   </section>
@@ -311,7 +417,7 @@
         <article>
           <span class="tag">Privacy demo</span>
           <h3>Synthea</h3>
-          <p>Fake patient records. The Privacy page has a Synthea chart button. Names, birth dates, ages, and record numbers are stripped before anything can leave.</p>
+          <p>The April 2020 Synthea sample, 1,171 living charts. The Privacy button loads the next record, not the same name every time. Names, birth dates, ages, and record numbers are stripped before anything can leave.</p>
         </article>
         <article>
           <span class="tag">Room bed</span>
@@ -339,7 +445,7 @@
         <li>Room 7, the default hidden tray, sounds balanced and the camera sees nine. Expect BLOCK.</li>
       </ul>
       <h3>Why the block is not an AI mood</h3>
-      <p>If the model misreads a line, the rule still needs a close request plus a real mismatch. The nurse’s count stays official. Killing the camera drops the room to audio only. Cutting the cloud keeps every urgent and every identifiable question on the box. Forging the ledger lights the seal, because the hash no longer matches.</p>
+      <p>If the model misreads a line, the rule still needs a close request plus a real mismatch. The nurse’s count stays official. Killing the camera drops the room to audio only. Cutting the cloud keeps every urgent and every identifiable question on the box.</p>
       <h3>Edge versus cloud</h3>
       <p>Primary inference stays here. The cloud is a protocol desk for anonymous, non-urgent questions the local model is unsure about. Names, dates of birth, ages, and record numbers are replaced before the send, then checked again. If anything remains, nothing is sent.</p>
       <p class="fine">Synthetic acted cases and generated trays. Not a medical device. Not for clinical use. The circulating nurse’s count stays the record of truth.</p>
@@ -347,24 +453,7 @@
   </section>
 </main>
 
-<div class="dock">
-  <div class="dock-row">
-    <button type="button" class="go" id="arm">ARM 8 ROOMS</button>
-    <button type="button" class="ghost" id="halt">HALT</button>
-    <div class="dock-picks" id="ors"><span>Rooms</span><button type="button" data-value="1">1</button><button type="button" data-value="4">4</button><button type="button" class="on" data-value="8">8</button></div>
-    <div class="dock-picks" id="speed"><span>Speed</span><button type="button" data-value="2">2</button><button type="button" class="on" data-value="4">4</button><button type="button" data-value="8">8</button><button type="button" data-value="20">20</button></div>
-    <div class="dock-picks" id="problem"><span>Hidden tray</span><button type="button" data-value="0">none</button><button type="button" data-value="1">1</button><button type="button" data-value="2">2</button><button type="button" data-value="3">3</button><button type="button" data-value="4">4</button><button type="button" data-value="5">5</button><button type="button" data-value="6">6</button><button type="button" class="on" data-value="7">7</button><button type="button" data-value="8">8</button></div>
-  </div>
-  <div class="dock-row">
-    <button type="button" class="hazard" id="cloudBtn">SEVER CLOUD</button>
-    <button type="button" class="hazard" id="visionBtn">KILL CAMERA</button>
-    <button type="button" class="hazard" id="tamperBtn">FORGE RECORD</button>
-    <button type="button" class="ghost" id="resetBtn">RESET CHAIN</button>
-    <button type="button" class="ghost" id="alarmBtn">ALARM OFF</button>
-    <span class="dock-note" id="dockNote">Rules hold the close. Models only read, count, and explain.</span>
-  </div>
-</div>
 <div id="toast" class="toast"></div>
-<script src="/static/app.js?v=10"></script>
+<script src="/static/app.js?v=30"></script>
 </body>
 </html>

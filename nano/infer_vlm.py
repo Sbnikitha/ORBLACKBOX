@@ -18,7 +18,7 @@ import sys
 import urllib.request
 from pathlib import Path
 
-URL = "http://127.0.0.1:8001/v1/chat/completions"
+URL = "http://100.81.221.41:8001/v1/chat/completions"
 MODEL = "Qwen/Qwen2.5-VL-7B-Instruct"
 
 

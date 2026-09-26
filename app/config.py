@@ -13,10 +13,42 @@ EXTERNAL_DIR = os.path.join(DATA_DIR, "external")
 OFFLINE_FLAG = os.path.join(STATE_DIR, "OFFLINE")
 VISION_DOWN = os.path.join(STATE_DIR, "VISION_DOWN")
 
-# "local" runs the on-box models in this repo.
-# Point these at ZRT (http://localhost:8000/v1 and :8001/v1) on a Nano.
-LLM_URL = os.getenv("LLM_URL", "local")
-VLM_URL = os.getenv("VLM_URL", "local")
+# Three inference boxes. Same ports. The command center switches which host is live.
+NANO2_HOST = os.getenv("NANO2_HOST", "100.82.233.80")
+HOSTS = (
+    {"id": "local", "label": "Local", "host": "127.0.0.1"},
+    {"id": "nano1", "label": "Nano 1", "host": "100.81.221.41"},
+    {"id": "nano2", "label": "Nano 2", "host": NANO2_HOST},
+)
+INFER_PORTS = {
+    "Detector": 8002,
+    "CountNet": 8003,
+    "ToolNet": 8004,
+    "Whisper": 8005,
+    "Language": 8006,
+    "TrayCount": 8007,
+    "Qwen3 27B": 8000,
+    "Qwen2.5-VL": 8001,
+}
+ACTIVE_HOST = "nano1"
+INFER_HOST = HOSTS[1]["host"]
+LLM_URL = os.getenv("LLM_URL", f"http://{INFER_HOST}:{INFER_PORTS['Qwen3 27B']}/v1")
+VLM_URL = os.getenv("VLM_URL", f"http://{INFER_HOST}:{INFER_PORTS['Qwen2.5-VL']}/v1")
+
+
+def apply_host(host_id):
+    """Point every model port at one of the three boxes."""
+    global ACTIVE_HOST, INFER_HOST, LLM_URL, VLM_URL
+    found = next((item for item in HOSTS if item["id"] == host_id), None)
+    if found is None:
+        raise ValueError("Unknown box")
+    if not found["host"]:
+        raise ValueError("Nano 2 address is not set")
+    ACTIVE_HOST = found["id"]
+    INFER_HOST = found["host"]
+    LLM_URL = f"http://{INFER_HOST}:{INFER_PORTS['Qwen3 27B']}/v1"
+    VLM_URL = f"http://{INFER_HOST}:{INFER_PORTS['Qwen2.5-VL']}/v1"
+    return found
 LLM_MODEL = os.getenv("LLM_MODEL", "or-sentinel-edge")
 VLM_MODEL = os.getenv("VLM_MODEL", "or-sentinel-traycount")
 

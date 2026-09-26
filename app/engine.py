@@ -7,6 +7,7 @@ import cases
 import config
 import photos
 import simulate
+import synthea
 
 
 class Floor:
@@ -35,6 +36,7 @@ class Floor:
             self.meta = {"running": True, "ors": ors, "speed": speed, "problem": problem}
             stop = self.stop
             self.threads = []
+            charts = synthea.take(ors)
             for i in range(1, ors + 1):
                 thread = threading.Thread(
                     target=simulate.run_or,
@@ -43,6 +45,7 @@ class Floor:
                         "script": scripts[(i - 1) % len(scripts)],
                         "speed": speed,
                         "hidden_problem": i == problem,
+                        "chart": charts[i - 1],
                         "stop": stop,
                         "guard": lambda token=token: token == self.token,
                     },
@@ -61,7 +64,7 @@ class Floor:
             if token == self.token:
                 self.meta["running"] = False
 
-    def start_case(self, or_id=1, procedure="appendectomy", focus="complete"):
+    def start_case(self, or_id=1, procedure="appendectomy", focus="complete", pictures="synthetic"):
         """Run one configured case into a single operating room. Other rooms stay."""
         or_id = max(1, min(int(or_id), 8))
         self.halt()
@@ -79,6 +82,7 @@ class Floor:
                 "case_or": or_id, "procedure": procedure, "focus": focus,
             }
             stop = self.stop
+            chart = synthea.take(1)[0]
             thread = threading.Thread(
                 target=simulate.run_or,
                 kwargs={
@@ -90,6 +94,8 @@ class Floor:
                     "hold_tools": hold,
                     "scenario": focus,
                     "procedure": label,
+                    "pictures": "demo" if pictures == "demo" else "synthetic",
+                    "chart": chart,
                     "stop": stop,
                     "guard": lambda token=token: token == self.token,
                 },

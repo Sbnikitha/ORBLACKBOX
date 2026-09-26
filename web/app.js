@@ -78,14 +78,14 @@ function pickValue(id) {
   return document.querySelector(`#${id} button.on`).dataset.value;
 }
 function renderLegend() {
-  const problem = Number(pickValue("problem"));
-  const n = Number(pickValue("ors"));
-  $("legend").innerHTML = Array.from({ length: n }, (_, i) => {
+  const legend = $("legend");
+  if (!legend) return;
+  const problem = $("problem") ? Number(pickValue("problem")) : 7;
+  const n = $("ors") ? Number(pickValue("ors")) : 8;
+  legend.innerHTML = Array.from({ length: n }, (_, i) => {
     const status = expectFor(i + 1, problem);
     return `<i>OR ${i + 1} · expect ${status}</i>`;
   }).join("");
-  $("arm").textContent = state.sim && state.sim.running ? "RUNNING" : `ARM ${n} ROOMS`;
-  $("arm").disabled = !!(state.sim && state.sim.running);
 }
 
 function bay(room) {
@@ -94,11 +94,12 @@ function bay(room) {
   const pct = room.line_total ? Math.round((room.line_index / room.line_total) * 100) : 0;
   const pills = CHECKS.map((key) => `<span class="${(room.checklist || []).includes(key) ? "on" : ""}">${CHECK_LABEL[key]}</span>`).join("");
   const lines = (room.transcript || []).slice(-3).map((line) => `<div>${esc(line)}</div>`).join("");
-  const photo = room.photo ? `<img src="/media/photos/${esc(room.photo)}" alt="Tray camera for OR ${room.or}" />` : "";
+  const photoSrc = room.photo_url || (room.photo ? `/media/photos/${room.photo}` : "");
+  const photo = photoSrc ? `<img src="${esc(photoSrc)}" alt="Tray camera for OR ${room.or}" />` : "";
   const verdict = room.done ? (room.status === room.expected ? "PASS" : "MISS") : `EXPECT ${room.expected || ""}`;
   return `
     <div class="bay-top"><h3 class="ornum">OR ${room.or}</h3><div class="status">${esc(room.status)}</div></div>
-    <div class="sub">${esc(room.procedure || "")} · ${esc(room.phase || "")} · ${esc(verdict)}</div>
+    <div class="sub">${esc(room.procedure || "")}${room.chart ? " · " + esc(room.chart.name) : ""} · ${esc(room.phase || "")} · ${esc(verdict)}</div>
     <div class="nums">
       <div><b>${room.added}</b><span class="sub">IN</span></div>
       <div><b>${room.removed}</b><span class="sub">OUT</span></div>
@@ -124,7 +125,7 @@ function renderFloor() {
   rooms.forEach((room) => {
     seen.add(String(room.or));
     let el = root.querySelector(`[data-or="${room.or}"]`);
-    const sig = [room.status, room.added, room.removed, room.vision_count, room.message, room.phase, room.photo, room.line_index, room.done, (room.transcript || []).at(-1)].join("|");
+    const sig = [room.status, room.added, room.removed, room.vision_count, room.message, room.phase, room.photo, room.line_index, room.done, room.chart && room.chart.id, (room.transcript || []).at(-1)].join("|");
     if (!el) {
       el = document.createElement("article");
       el.dataset.or = room.or;
@@ -159,17 +160,10 @@ function renderMetrics() {
     [m.held || 0, "Closes held"],
   ];
   $("metrics").innerHTML = cards.map(([value, label]) => `<div class="metric"><b>${esc(value)}</b><span>${label}</span></div>`).join("");
-  const seal = $("integrity");
-  if (state.ledger && state.ledger.ok === false) {
-    seal.className = "seal bad";
-    seal.textContent = `TAMPERED #${state.ledger.broken_at}`;
-  } else {
-    seal.className = "seal";
-    seal.textContent = `SEALED · ${state.ledger ? state.ledger.count : 0}`;
-  }
-  $("cloudBtn").textContent = state.cloud_offline ? "RESTORE CLOUD" : "SEVER CLOUD";
-  $("visionBtn").textContent = state.vision_down ? "RESTORE CAMERA" : "KILL CAMERA";
-  $("station").textContent = (state.models && state.models.llm_backend) || "edge models";
+  if ($("cloudBtn")) $("cloudBtn").textContent = state.cloud_offline ? "RESTORE CLOUD" : "SEVER CLOUD";
+  if ($("visionBtn")) $("visionBtn").textContent = state.vision_down ? "RESTORE CAMERA" : "KILL CAMERA";
+  const station = $("station");
+  if (station) station.textContent = (state.models && state.models.llm_backend) || "edge models";
   renderLegend();
 }
 
@@ -191,7 +185,7 @@ async function tick() {
     if (!$("ledger").classList.contains("hidden")) renderChain();
     if (!$("live").classList.contains("hidden")) renderLive();
   } catch (err) {
-    $("dockNote").textContent = "Command link lost";
+    toast("Command link lost");
   }
 }
 
@@ -201,10 +195,12 @@ let voiceQueue = [];
 let voiceBusy = false;
 let voiceCursor = -1;
 let voiceCase = "";
+let voiceToken = 0;
 let caseLive = false;
 let armStarted = 0;
 let scrubLock = false;
 function resetVoice() {
+  voiceToken += 1;
   voiceHeard = 0;
   voiceQueue = [];
   voiceBusy = false;
@@ -232,25 +228,29 @@ function syncVoice(tape, caseId, started) {
   voiceBusy = true;
   wavePhase.amp = 1;
   monitorBed(true);
+  const token = ++voiceToken;
   const utter = new SpeechSynthesisUtterance(next.text);
-  utter.rate = 0.9;
-  let finished = false;
+  utter.rate = 0.92;
   const done = () => {
-    if (finished) return;
-    finished = true;
+    if (token !== voiceToken) return;
+    voiceToken += 1;
     voiceBusy = false;
     if (!voiceQueue.length) monitorBed(false);
     renderLive();
   };
   utter.onend = done;
   utter.onerror = done;
-  window.speechSynthesis.speak(utter);
-  setTimeout(done, Math.min(14000, 1200 + next.text.length * 75));
+  window.speechSynthesis.cancel();
+  window.setTimeout(() => {
+    if (token !== voiceToken) return;
+    window.speechSynthesis.speak(utter);
+  }, 60);
 }
 const wavePhase = { amp: 0.15 };
 
-function stageHTML(photo, boxes, frameW, frameH, live) {
-  if (!photo) return `<div class="empty"><strong>NO FRAME</strong><p>Waiting for the tray camera.</p></div>`;
+function stageHTML(photo, boxes, frameW, frameH, live, photoUrl) {
+  if (!photo && !photoUrl) return `<div class="empty"><strong>NO FRAME</strong><p>Waiting for the tray camera.</p></div>`;
+  const src = photoUrl || `/media/photos/${photo}?v=2`;
   const color = { sponge: "#ff5a72", instrument: "#7ee7ff", sharp: "#ffc14d", missing: "#ff3355" };
   const marks = (boxes || []).map((box) => {
     const stroke = color[box.kind] || "#ff5a72";
@@ -260,8 +260,9 @@ function stageHTML(photo, boxes, frameW, frameH, live) {
     <text class="tag" x="${box.x}" y="${Math.max(16, box.y - 4)}" fill="${stroke}">${esc(name)}</text>`;
   }).join("");
   const stamp = live ? "LIVE · OR CAM 2 · TRAY" : "BLACK BOX · PLAYBACK";
-  return `<div class="cam ${live ? "live" : "tape"}">
-    <img src="/media/photos/${esc(photo)}?v=2" alt="Overhead tray camera" />
+  const fit = arguments[6] ? " fit" : "";
+  return `<div class="cam ${live ? "live" : "tape"}${fit}">
+    <img src="${esc(src)}" alt="Overhead tray camera" />
     <div class="vignette"></div>
     <div class="grain"></div>
     <div class="hud"><span>${stamp}</span><span class="tc"></span></div>
@@ -287,8 +288,9 @@ function renderLive() {
   const idx = followVoice ? voiceCursor : Math.max(0, tape.length - 1);
   const frameNow = tape[idx] || null;
   const photo = frameNow ? frameNow.photo : room.photo;
+  const photoUrl = frameNow ? frameNow.photo_url : room.photo_url;
   const boxes = frameNow ? frameNow.boxes : room.boxes;
-  $("liveStage").innerHTML = stageHTML(photo, boxes, frameNow ? frameNow.frame_w : room.frame_w, frameNow ? frameNow.frame_h : room.frame_h, true);
+  $("liveStage").innerHTML = stageHTML(photo, boxes, frameNow ? frameNow.frame_w : room.frame_w, frameNow ? frameNow.frame_h : room.frame_h, true, photoUrl);
   const line = frameNow ? frameNow.text : "Listening for the circulating nurse.";
   $("liveCaption").textContent = line;
   const agents = room.last_agents || {};
@@ -311,7 +313,11 @@ function renderLive() {
   const logBox = $("procedureLog");
   if (!room.done) logBox.scrollTop = logBox.scrollHeight;
   $("orNow").textContent = `${room.procedure || ""}\n${room.op_phase || room.phase || ""}\nLine ${room.line_index || 0} of ${room.line_total || 0}`;
-  $("patientNow").textContent = log.length ? log.map((item) => `${item.t}s  ${item.text}`).join("\n") : "Vitals steady. No infusion change yet.";
+  const chart = room.chart;
+  const head = chart
+    ? `${chart.name}\nBirth date ${chart.birthdate} · age ${chart.age} · ${chart.gender}\nMRN ${chart.id}\n${chart.city}, ${chart.state}\nAllergies: ${(chart.allergies || []).join(", ") || "none listed"}\n`
+    : "";
+  $("patientNow").textContent = head + (log.length ? log.map((item) => `${item.t}s  ${item.text}`).join("\n") : "Vitals steady. No infusion change yet.");
   $("alertNow").textContent = (room.alerts || []).join("\n") || "No alert right now.";
   $("analytics").textContent = room.done
     ? `${room.procedure}\nFinal ${room.status}. In ${room.added} out ${room.removed} camera ${room.vision_count}.\nTools still inside: ${(room.tools_inside || []).join(", ") || "none"}.\nFocus ${room.scenario || "complete"}.\nThis room is on the floor dashboard.`
@@ -334,13 +340,13 @@ function renderLive() {
   if (frame && !frame.photo) {
     for (let i = Number(scrub.value); i >= 0; i--) {
       if (tape[i].photo) {
-        frame = Object.assign({}, frame, { photo: tape[i].photo, boxes: tape[i].boxes, frame_w: tape[i].frame_w, frame_h: tape[i].frame_h });
+        frame = Object.assign({}, frame, { photo: tape[i].photo, photo_url: tape[i].photo_url, boxes: tape[i].boxes, frame_w: tape[i].frame_w, frame_h: tape[i].frame_h });
         break;
       }
     }
   }
   $("tapeMeta").textContent = tape.length ? `${tape.length} marks · t ${frame ? frame.t : 0}s` : "no tape yet";
-  $("boxStage").innerHTML = frame ? stageHTML(frame.photo, frame.boxes, frame.frame_w, frame.frame_h, false) : `<div class="empty"><strong>TAPE EMPTY</strong></div>`;
+  $("boxStage").innerHTML = frame ? stageHTML(frame.photo, frame.boxes, frame.frame_w, frame.frame_h, false, frame.photo_url) : `<div class="empty"><strong>TAPE EMPTY</strong></div>`;
   $("marks").innerHTML = tape.map((mark, index) => `<button type="button" class="${index === Number(scrub.value) ? "on" : ""} ${(mark.alerts || []).length ? "alert" : ""}" data-i="${index}">${esc(mark.t)}s ${esc(mark.kind)}</button>`).join("");
   const alertText = frame && (frame.alerts || []).length ? frame.alerts.join("\n") : "No alert on this mark.";
   $("boxAnalysis").textContent = frame
@@ -368,14 +374,60 @@ function drawWave() {
   requestAnimationFrame(drawWave);
 }
 
+let livePictures = "synthetic";
+
+function liveCopy() {
+  const synthetic = livePictures !== "demo";
+  const title = $("liveTitle");
+  const blurb = $("liveBlurb");
+  if (title) title.textContent = synthetic ? "Synthetic Live" : "Demo";
+  if (blurb) {
+    blurb.textContent = synthetic
+      ? "Drawn tray photos and the black box. The procedure, the speech, and the rules are the same case."
+      : "The same case. Tray photos come from data/composites/train.";
+  }
+}
+
 function show(tab) {
   document.body.classList.toggle("on-live", tab === "live");
-  document.querySelectorAll(".tab").forEach((btn) => btn.classList.toggle("on", btn.dataset.tab === tab));
+  document.body.classList.toggle("on-floor", tab === "floor");
+  document.body.classList.toggle("on-real", tab === "real");
+  document.querySelectorAll(".tab").forEach((btn) => {
+    const picturesOk = btn.dataset.tab !== "live" || btn.dataset.pictures === livePictures;
+    btn.classList.toggle("on", btn.dataset.tab === tab && picturesOk);
+  });
   document.querySelectorAll(".view").forEach((view) => view.classList.toggle("hidden", view.id !== tab));
   if (tab === "ledger") renderChain();
   if (tab === "evidence") loadTests(false);
   if (tab === "models") { loadFilm(); loadTrained(); }
-  if (tab === "live") renderLive();
+  if (tab === "live") {
+    liveCopy();
+    renderLive();
+  }
+  if (tab === "real") loadDetect();
+}
+
+async function loadDetect() {
+  const film = $("detectFilm");
+  if (!film || film.dataset.ready) return;
+  const data = await api("/api/detect/samples");
+  film.innerHTML = data.images.map((photo) => `
+    <button type="button" data-name="${esc(photo.name)}" data-needle="${esc(photo.needle || "")}">
+      <img src="${esc(photo.url)}" width="640" height="640" alt="${esc(photo.needle || photo.name)}" />
+      <span>${esc(photo.needle || photo.name)}</span>
+    </button>`).join("");
+  film.dataset.ready = "1";
+  film.onclick = async (event) => {
+    const button = event.target.closest("button");
+    if (!button) return;
+    const url = `/media/composites/train/${button.dataset.name}`;
+    $("detectStage").innerHTML = stageHTML(button.dataset.name, [], 640, 640, false, url, true);
+    $("detectRead").textContent = `Photo loaded. Detector ${data.address} is reading it…\nNeedle on tray: ${button.dataset.needle}`;
+    const result = await post("/api/detect", { name: button.dataset.name });
+    const needles = (result.boxes || []).filter((box) => box.kind === "sharp").map((box) => box.label);
+    $("detectStage").innerHTML = stageHTML(result.name, result.boxes, result.width, result.height, false, url, true);
+    $("detectRead").textContent = `${result.address} · ${result.width}×${result.height}\n${result.ms} ms · cotton ${result.cotton} · tools ${result.tools} · hands ${result.hands}\nNeedle on tray: ${needles.join(", ") || button.dataset.needle}`;
+  };
 }
 
 async function loadTests(force) {
@@ -443,42 +495,20 @@ async function loadFilm() {
   };
 }
 
-document.querySelectorAll(".tab").forEach((btn) => btn.onclick = () => show(btn.dataset.tab));
+document.querySelectorAll(".tab").forEach((btn) => btn.onclick = () => {
+  if (btn.dataset.pictures) livePictures = btn.dataset.pictures;
+  show(btn.dataset.tab);
+});
 ["ors", "speed", "problem"].forEach((id) => {
-  $(id).onclick = (event) => {
+  const box = $(id);
+  if (!box) return;
+  box.onclick = (event) => {
     const button = event.target.closest("button");
     if (!button) return;
-    $(id).querySelectorAll("button").forEach((item) => item.classList.toggle("on", item === button));
+    box.querySelectorAll("button").forEach((item) => item.classList.toggle("on", item === button));
     renderLegend();
   };
 });
-$("arm").onclick = async () => {
-  prev = {};
-  await post("/api/simulate", {
-    ors: Number(pickValue("ors")),
-    speed: Number(pickValue("speed")),
-    problem: Number(pickValue("problem")),
-  });
-  toast("Floor armed");
-  tick();
-};
-$("halt").onclick = async () => { await post("/api/halt"); toast("Halted"); tick(); };
-$("cloudBtn").onclick = async () => {
-  await post("/api/cloud", { cut: !state.cloud_offline });
-  toast(state.cloud_offline ? "Cloud restored" : "Cloud cut");
-  tick();
-};
-$("visionBtn").onclick = async () => {
-  await post("/api/vision", { down: !state.vision_down });
-  toast(state.vision_down ? "Camera restored" : "Camera killed");
-  tick();
-};
-$("tamperBtn").onclick = async () => { await post("/api/tamper"); toast("Record forged"); tick(); };
-$("resetBtn").onclick = async () => { await post("/api/ledger/reset"); toast("New chain"); tick(); };
-$("alarmBtn").onclick = () => {
-  alarmOn = !alarmOn;
-  $("alarmBtn").textContent = alarmOn ? "ALARM ON" : "ALARM OFF";
-};
 $("askBtn").onclick = async () => {
   const result = await post("/api/ask", { question: $("question").value, urgent: $("urgent").checked });
   $("privacyOut").innerHTML = `
@@ -495,8 +525,9 @@ $("presetPhi").onclick = () => {
   $("question").value = "Patient Maria Lopez, DOB 03/14/1971, MRN 4471923, left laparoscopic appendectomy. Which counts are required before closing?";
   $("urgent").checked = false;
 };
-$("presetSynthea").onclick = () => {
-  $("question").value = "Synthea patient Alicia Johnson, birthDate 1952-04-12, MRN 100089, age 73, laparoscopic appendectomy. Which counts are required before closing?";
+$("presetSynthea").onclick = async () => {
+  const result = await api("/api/synthea/next");
+  $("question").value = result.question;
   $("urgent").checked = false;
 };
 $("presetClean").onclick = () => {
@@ -549,6 +580,7 @@ $("liveArm").onclick = async () => {
     procedure: caseProcedure,
     focus: caseFocus,
     room: Number(document.querySelector("#caseRooms button.on").dataset.room),
+    pictures: livePictures,
   });
   caseLive = true;
   $("caseSetup").classList.add("hidden");
@@ -571,7 +603,52 @@ $("marks").onclick = (event) => {
   renderLive();
 };
 requestAnimationFrame(drawWave);
+function paintHosts(data) {
+  const box = $("hostSwitch");
+  if (!box || !data.hosts) return;
+  const current = data.hosts.find((item) => item.id === data.active) || data.hosts[0];
+  const detectPort = (data.ports && data.ports.Detector) || 8002;
+  box.innerHTML = data.hosts.map((item) => {
+    const on = item.id === data.active ? " on" : "";
+    const off = item.host ? "" : " disabled";
+    const address = item.host || "no address";
+    return `<button type="button" class="${on.trim()}" data-host="${esc(item.id)}"${off}><b>${esc(item.label)}</b><small>${esc(address)}</small></button>`;
+  }).join("");
+  if (current && current.host) {
+    if ($("detectHost")) $("detectHost").textContent = `${current.host}:${detectPort}`;
+    if ($("archHost")) $("archHost").textContent = current.host;
+    if ($("archDetect")) $("archDetect").textContent = `${current.host}:${detectPort}`;
+  }
+}
+async function loadModelLamps() {
+  const box = $("modelLamps");
+  if (!box) return;
+  try {
+    const data = await api("/api/models/live");
+    paintHosts(data);
+    box.innerHTML = data.models.map((item) =>
+      `<div class="lamp ${item.up ? "up" : ""}"><i></i><b>${esc(item.name)}</b> ${esc(item.address)}<em>${item.up ? "UP" : "DOWN"}</em></div>`
+    ).join("");
+  } catch (error) {
+    box.textContent = "model status unavailable";
+  }
+}
+const hostSwitch = $("hostSwitch");
+if (hostSwitch) {
+  hostSwitch.onclick = async (event) => {
+    const button = event.target.closest("button");
+    if (!button || button.disabled) return;
+    try {
+      await post("/api/host", { id: button.dataset.host });
+      await loadModelLamps();
+    } catch (error) {
+      toast(String(error.message || error).replace(/^"|"$/g, ""));
+    }
+  };
+}
 setInterval(() => { $("clock").textContent = new Date().toLocaleTimeString(); }, 1000);
+loadModelLamps();
+setInterval(loadModelLamps, 4000);
 $("clock").textContent = new Date().toLocaleTimeString();
 renderLegend();
 tick();

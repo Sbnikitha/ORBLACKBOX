@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OR Sentinel — the black box</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+  :root { --bg:#07110e; --ink:#e8f7f1; --muted:#9bb5ab; --line:rgba(166,255,220,.22); --safe:#3ee0a2; --caution:#ffc14d; --block:#ff4d6a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: Sora, "Segoe UI", sans-serif; }
+  body { overflow: hidden; }
+  .stage { height: 100%; display: grid; grid-template-rows: auto 1fr auto; padding: 12px 4vw 10px; background: var(--bg); transition: background .45s ease; }
+  .stage[data-look="air"] { background: radial-gradient(820px 420px at 78% 42%, rgba(255,193,77,.18), transparent 62%), #07110e; }
+  .stage[data-look="room"] { background: radial-gradient(700px 380px at 50% 70%, rgba(62,224,162,.12), transparent 60%), #07110e; }
+  .stage[data-look="rule"] { background: linear-gradient(90deg, rgba(62,224,162,.08), rgba(255,193,77,.08) 50%, rgba(255,77,106,.1)), #07110e; }
+  .stage[data-look="comply"] { background: radial-gradient(640px 360px at 50% 30%, rgba(90,170,255,.14), transparent 60%), #07110e; }
+  .stage[data-look="zrt"] { background: radial-gradient(700px 400px at 20% 80%, rgba(62,224,162,.12), transparent 55%), #07110e; }
+  .stage[data-look="cloud"] { background: radial-gradient(640px 360px at 80% 20%, rgba(255,77,106,.16), transparent 60%), #07110e; }
+  .stage[data-look="metrics"] { background: radial-gradient(900px 280px at 50% 75%, rgba(62,224,162,.1), transparent 70%), #07110e; }
+  .stage[data-look="term"] { background: #050a08; }
+  .stage[data-look="cost"] { background: radial-gradient(760px 420px at 50% 45%, rgba(255,193,77,.16), transparent 62%), #07110e; }
+  .stage[data-look="close"] { background: radial-gradient(900px 500px at 50% 50%, rgba(62,224,162,.16), transparent 65%), #07110e; }
+  header, footer { display: flex; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .kicker { margin: 0; font-family: "IBM Plex Mono", monospace; letter-spacing: .16em; font-size: 12px; color: var(--safe); }
+  nav { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; width: 100%; }
+  nav button, .move button, .gate {
+    font: inherit; color: var(--ink); background: transparent; border: 1px solid var(--line);
+    border-radius: 999px; padding: 6px 10px; cursor: pointer;
+  }
+  nav button[aria-selected="true"] { background: var(--safe); color: #062117; border-color: transparent; font-weight: 600; }
+  button:focus-visible, .gate:focus-visible { outline: 2px solid var(--safe); outline-offset: 2px; }
+  #deck { min-height: 0; height: 100%; }
+  .slide { display: none; height: 100%; width: 100%; overflow: auto; }
+  .slide.on {
+    display: flex; flex-direction: column; justify-content: safe center; align-items: stretch;
+    gap: 16px; text-align: center; animation: in .45s ease;
+  }
+  @keyframes in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+  h1 { margin: 0; font-family: "Barlow Condensed", sans-serif; font-size: clamp(30px, 3.8vw, 52px); line-height: .94; letter-spacing: .01em; }
+  .hero h1 { font-size: clamp(46px, 6.2vw, 84px); }
+  .lead { margin: 0 auto; max-width: 920px; color: var(--muted); font-size: 17px; line-height: 1.45; }
+  .fine { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.4; }
+  .left { text-align: left; }
+
+  .radar { width: 120px; height: 120px; margin: 0 auto; border-radius: 50%; border: 1px solid var(--line); position: relative; overflow: hidden; }
+  .radar i { position: absolute; inset: 0; background: conic-gradient(from 0deg, transparent 0 72%, rgba(62,224,162,.55) 100%); animation: sweep 2.8s linear infinite; }
+  .radar::after { content: ""; position: absolute; inset: 28%; border-radius: 50%; border: 1px solid var(--line); }
+  @keyframes sweep { to { transform: rotate(360deg); } }
+  .chips { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .chip { font-family: "Barlow Condensed", sans-serif; letter-spacing: .14em; font-size: 22px; padding: 8px 16px; border-radius: 999px; border: 1px solid var(--line); }
+  .chip.safe { color: var(--safe); animation: pulse 2.2s ease-in-out infinite; }
+  .chip.caution { color: var(--caution); animation: pulse 2.2s ease-in-out .4s infinite; }
+  .chip.block { color: var(--block); animation: pulse 2.2s ease-in-out .8s infinite; }
+  @keyframes pulse { 50% { transform: translateY(-3px); } }
+
+  .split { display: grid; grid-template-columns: 1.15fr .85fr; gap: 28px; align-items: center; text-align: left; }
+  .recorder { background: #101612; border: 1px solid var(--line); border-radius: 18px; padding: 14px; box-shadow: inset 0 0 0 6px #0b1411; }
+  .recorder head, .rec-top { display: flex; justify-content: space-between; align-items: center; font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--caution); margin-bottom: 8px; }
+  .led { width: 10px; height: 10px; border-radius: 50%; background: var(--block); box-shadow: 0 0 10px var(--block); animation: blink 1.1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: .25; } }
+  .window { height: 168px; overflow: hidden; mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent); }
+  .tape { animation: roll 10s linear infinite; font-family: "IBM Plex Mono", monospace; font-size: 14px; line-height: 1.7; color: var(--ink); }
+  @keyframes roll { to { transform: translateY(-50%); } }
+
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; list-style: none; margin: 0; padding: 0; text-align: left; }
+  .steps li { border-top: 3px solid var(--safe); padding-top: 10px; }
+  .steps li:nth-child(2) { border-color: var(--caution); }
+  .steps li:nth-child(3) { border-color: var(--block); }
+  .steps em { font-family: "IBM Plex Mono", monospace; font-style: normal; color: var(--muted); font-size: 12px; }
+  .steps strong { display: block; font-family: "Barlow Condensed", sans-serif; font-size: 28px; margin: 4px 0; }
+  .steps span { color: var(--muted); font-size: 14px; }
+  .runner { height: 8px; border-radius: 99px; background: rgba(255,255,255,.08); position: relative; }
+  .runner i { position: absolute; top: -6px; width: 20px; height: 20px; border-radius: 50%; background: var(--safe); animation: travel 3.6s ease-in-out infinite; }
+  @keyframes travel { 0% { left: 0; background: var(--safe); } 45% { background: var(--caution); } 100% { left: calc(100% - 20px); background: var(--block); } }
+  .tally { display: flex; gap: 18px; justify-content: center; align-items: center; }
+  .tally b { font-family: "Barlow Condensed", sans-serif; font-size: 64px; display: block; line-height: .9; }
+  .tally span { color: var(--muted); font-size: 13px; letter-spacing: .12em; }
+  .miss { color: var(--block); }
+  .blockchip { font-family: "Barlow Condensed", sans-serif; font-size: 36px; letter-spacing: .16em; color: #062117; background: var(--block); padding: 10px 18px; border-radius: 12px; animation: stamp 1.8s ease-in-out infinite; }
+  @keyframes stamp { 50% { transform: scale(1.04); } }
+
+  .flow { display: grid; grid-template-columns: 1fr 40px 1fr 40px 1fr 1.1fr; gap: 8px; align-items: center; }
+  .node { border: 1px solid var(--line); border-radius: 16px; padding: 16px 12px; background: rgba(8,26,22,.8); min-height: 110px; }
+  .node b { display: block; font-family: "Barlow Condensed", sans-serif; font-size: 26px; }
+  .node span { color: var(--muted); font-size: 13px; }
+  .arrow { height: 2px; background: linear-gradient(90deg, transparent, var(--safe)); position: relative; }
+  .arrow i { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: var(--safe); top: -3px; animation: hop 1.4s linear infinite; }
+  @keyframes hop { from { left: 0; } to { left: calc(100% - 8px); } }
+  .lamps { display: flex; flex-direction: column; gap: 8px; }
+  .lamps div { border-radius: 999px; padding: 8px 12px; font-family: "Barlow Condensed", sans-serif; letter-spacing: .12em; font-size: 20px; border: 1px solid var(--line); opacity: .35; }
+  .lamps .s { color: var(--safe); animation: lamp 3.6s infinite; }
+  .lamps .c { color: var(--caution); animation: lamp 3.6s 1.2s infinite; }
+  .lamps .b { color: var(--block); animation: lamp 3.6s 2.4s infinite; }
+  @keyframes lamp { 0%, 20% { opacity: 1; background: rgba(255,255,255,.04); } 33%, 100% { opacity: .3; background: transparent; } }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .stat { padding: 8px; }
+  .stat b { display: block; font-family: "Barlow Condensed", sans-serif; font-size: clamp(64px, 8vw, 110px); line-height: .85; color: var(--safe); }
+  .stat:nth-child(2) b { color: var(--caution); }
+  .stat:nth-child(3) b { color: var(--ink); font-size: clamp(40px, 5vw, 72px); padding-top: 18px; }
+  .stat span { color: var(--muted); }
+
+  .vault { display: grid; grid-template-columns: 1.1fr .9fr; gap: 22px; align-items: center; text-align: left; }
+  .gates { display: flex; flex-wrap: wrap; gap: 8px; }
+  .gate.on { background: var(--safe); color: #062117; border-color: transparent; }
+  .door { height: 220px; border-radius: 18px; border: 2px solid var(--safe); display: grid; place-items: center; font-family: "Barlow Condensed", sans-serif; font-size: 42px; letter-spacing: .08em; position: relative; overflow: hidden; }
+  .door.shut { border-color: var(--block); color: var(--block); }
+  .door.open { border-color: var(--caution); color: var(--caution); }
+  .door i { position: absolute; inset: 0 auto 0 0; width: 0; background: rgba(255,77,106,.18); }
+  .door.shut i { width: 100%; transition: width .35s ease; }
+  .verdict { font-family: "Barlow Condensed", sans-serif; font-size: 40px; margin: 6px 0 0; }
+  .stay { color: var(--safe); }
+  .leave { color: var(--caution); }
+
+  .rack { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: left; }
+  .rack div { display: flex; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: #0c1613; font-size: 14px; }
+  .rack b { font-family: "IBM Plex Mono", monospace; color: var(--safe); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--safe); animation: blink 1.6s infinite; flex: none; }
+  .dot:nth-child(1) { animation-delay: .2s; }
+  .race { display: grid; gap: 10px; text-align: left; }
+  .race div { display: grid; grid-template-columns: 220px 1fr; gap: 10px; align-items: center; font-size: 14px; }
+  .race i { display: block; height: 14px; width: 0; border-radius: 99px; background: var(--safe); }
+  .slide.on .race i { animation: fill .9s ease forwards; }
+  .race .long { background: var(--block); }
+  @keyframes fill { to { width: var(--w); } }
+
+  .paths { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; text-align: left; }
+  .path { border-radius: 16px; padding: 16px; min-height: 180px; border: 1px solid var(--line); position: relative; overflow: hidden; }
+  .path b { display: block; font-family: "Barlow Condensed", sans-serif; font-size: 28px; margin-bottom: 8px; }
+  .path span { color: var(--muted); font-size: 14px; }
+  .path.no { background: linear-gradient(180deg, rgba(255,77,106,.14), transparent); }
+  .path.no::after {
+    content: "NO"; position: absolute; top: 12px; right: 12px;
+    font-family: "Barlow Condensed", sans-serif; letter-spacing: .12em; font-size: 18px;
+    color: var(--block); border: 1px solid var(--block); border-radius: 999px; padding: 2px 8px;
+  }
+  .path.yes::after {
+    content: "YES"; position: absolute; top: 12px; right: 12px;
+    font-family: "Barlow Condensed", sans-serif; letter-spacing: .12em; font-size: 18px;
+    color: var(--safe); border: 1px solid var(--safe); border-radius: 999px; padding: 2px 8px;
+  }
+  .path.yes { background: linear-gradient(180deg, rgba(62,224,162,.16), transparent); border-color: rgba(62,224,162,.45); }
+
+  .lanes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: left; }
+  .lane { border-radius: 16px; padding: 12px; background: rgba(8,26,22,.72); border: 1px solid var(--line); }
+  .lane h2 { margin: 0 0 8px; font-family: "Barlow Condensed", sans-serif; font-size: 22px; letter-spacing: .08em; }
+  .lane p { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+  .lane p b { color: var(--ink); font-family: "IBM Plex Mono", monospace; font-weight: 500; }
+  .lane.see { border-top: 3px solid #7ee0ff; }
+  .lane.hear { border-top: 3px solid var(--caution); }
+  .lane.read { border-top: 3px solid #c9a6ff; }
+  .lane.lock { border-top: 3px solid var(--block); }
+
+  .chartrow { display: grid; grid-template-columns: 1fr 180px; gap: 18px; align-items: end; }
+  .cols { display: flex; align-items: stretch; gap: 10px; height: 250px; }
+  .c { flex: 1; display: grid; grid-template-rows: auto 1fr auto; justify-items: center; min-width: 0; }
+  .c b { font-family: "Barlow Condensed", sans-serif; font-size: 20px; }
+  .c i { align-self: end; width: min(56px, 100%); height: calc(var(--p) * 1.7px); border-radius: 10px 10px 3px 3px; background: linear-gradient(180deg, #8fffd4, #128a5e); transform-origin: bottom; animation: rise .9s cubic-bezier(.2,.7,.2,1) both; }
+  .c.warm i { background: linear-gradient(180deg, #ffe1a3, #c4841a); }
+  .c em { font-style: normal; color: var(--muted); font-size: 12px; text-align: center; margin-top: 6px; }
+  @keyframes rise { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+  .rings { display: flex; flex-direction: column; gap: 12px; }
+  .ring { display: grid; grid-template-columns: 72px 1fr; gap: 8px; align-items: center; text-align: left; }
+  .ring b, .ring .fine { display: block; }
+  .ring svg { width: 72px; height: 72px; }
+  .ring circle { fill: none; stroke-width: 3.2; }
+  .ring .bg { stroke: rgba(255,255,255,.1); }
+  .ring .fg { stroke: var(--safe); stroke-dasharray: 94.2; stroke-dashoffset: 94.2; transform-origin: 18px 18px; transform: rotate(-90deg); animation: ring 1s ease forwards; }
+  @keyframes ring { to { stroke-dashoffset: 0; } }
+  .pub { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .pub div { border-left: 3px solid var(--caution); padding: 6px 10px; text-align: left; font-size: 13px; color: var(--muted); }
+  .pub b { display: block; color: var(--ink); font-family: "Barlow Condensed", sans-serif; font-size: 22px; }
+
+  .pairs { display: grid; gap: 8px; }
+  .pair { display: grid; grid-template-columns: 1.2fr 28px .8fr; gap: 8px; align-items: center; text-align: left; }
+  .pair span, .pair b { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+  .pair b { font-family: "Barlow Condensed", sans-serif; font-size: 22px; color: var(--safe); }
+  .pair i { height: 2px; background: var(--safe); transform-origin: left; animation: link .5s ease both; }
+  @keyframes link { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+  .term { text-align: left; background: #030806; border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; font-family: "IBM Plex Mono", monospace; font-size: 15px; line-height: 1.7; box-shadow: 0 0 0 1px rgba(62,224,162,.15); }
+  .term .ok { color: var(--safe); }
+  .caret { display: inline-block; width: 8px; height: 15px; background: var(--safe); margin-left: 4px; animation: blink 1s steps(1) infinite; vertical-align: text-bottom; }
+
+  .qs { display: grid; gap: 10px; text-align: left; }
+  .q { display: grid; grid-template-columns: 72px 1fr; gap: 12px; align-items: center; }
+  .q em { font-family: "Barlow Condensed", sans-serif; font-style: normal; font-size: 48px; color: var(--safe); }
+  .q:nth-child(2) em { color: var(--caution); }
+  .q:nth-child(3) em { color: #7ee0ff; }
+  .q b { display: block; font-size: 18px; }
+  .q span { color: var(--muted); font-size: 14px; }
+
+  .floor { display: grid; grid-template-columns: 1.2fr 40px .7fr 40px .7fr; gap: 8px; align-items: center; }
+  .wing { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .wing span { height: 54px; border: 1px solid var(--line); border-radius: 8px; background: rgba(62,224,162,.08); animation: room 2.4s ease-in-out infinite; }
+  .wing span:nth-child(2), .wing span:nth-child(5), .wing span:nth-child(8) { background: rgba(255,77,106,.2); border-color: rgba(255,77,106,.5); animation-delay: .3s; }
+  .wing span:nth-child(3), .wing span:nth-child(6) { background: rgba(255,193,77,.16); border-color: rgba(255,193,77,.45); animation-delay: .6s; }
+  @keyframes room { 50% { transform: translateY(-3px); } }
+  .cable { height: 3px; background: repeating-linear-gradient(90deg, var(--safe) 0 8px, transparent 8px 14px); animation: march 1s linear infinite; }
+  @keyframes march { to { background-position: 14px 0; } }
+  .nano, .nano2 { border: 1px solid var(--safe); border-radius: 16px; padding: 16px 10px; font-family: "Barlow Condensed", sans-serif; font-size: 28px; }
+  .nano2 { border-style: dashed; color: var(--muted); border-color: var(--muted); }
+
+  .strips { display: grid; gap: 10px; text-align: left; }
+  .strip { display: grid; grid-template-columns: 16px 1fr; gap: 12px; align-items: start; padding: 12px 14px; border-radius: 14px; background: rgba(8,26,22,.75); border: 1px solid var(--line); }
+  .strip .lamp { width: 12px; height: 12px; border-radius: 50%; margin-top: 4px; }
+  .strip .bad { background: var(--block); box-shadow: 0 0 10px var(--block); }
+  .strip .mid { background: var(--caution); }
+  .strip .good { background: var(--safe); animation: blink 1.8s infinite; }
+  .strip b { display: block; }
+  .strip span { color: var(--muted); font-size: 14px; }
+
+  .money { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .money article { border-radius: 18px; padding: 16px; border: 1px solid var(--line); text-align: left; min-height: 160px; }
+  .money b { display: block; font-family: "Barlow Condensed", sans-serif; font-size: clamp(36px, 4vw, 58px); line-height: .9; }
+  .money span { color: var(--muted); font-size: 14px; }
+  .money .claim { border-color: rgba(255,77,106,.45); }
+  .money .claim b { color: var(--block); font-size: clamp(28px, 3vw, 42px); }
+
+  .road { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; position: relative; text-align: left; margin-top: 8px; }
+  .road::before { content: ""; position: absolute; left: 6%; right: 6%; top: 18px; height: 3px; background: var(--line); }
+  .road i.mover { position: absolute; top: 10px; width: 18px; height: 18px; border-radius: 50%; background: var(--safe); animation: travel 4s ease-in-out infinite; }
+  .stop { position: relative; padding-top: 40px; }
+  .stop::before { content: ""; position: absolute; top: 10px; left: 12px; width: 18px; height: 18px; border-radius: 50%; background: #07110e; border: 3px solid var(--safe); }
+  .stop b { display: block; font-family: "Barlow Condensed", sans-serif; font-size: 26px; }
+  .stop span { color: var(--muted); font-size: 14px; }
+
+  .closer { display: grid; gap: 6px; }
+  .closer b { font-family: "Barlow Condensed", sans-serif; font-size: clamp(40px, 6vw, 78px); line-height: .9; }
+  .links { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .links a { color: var(--ink); text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; }
+  footer .move { display: flex; gap: 8px; }
+
+  @media (max-width: 980px) {
+    .split, .vault, .chartrow, .flow, .floor, .lanes, .paths, .stats, .money, .steps, .pub { grid-template-columns: 1fr; }
+    .flow { grid-template-columns: 1fr; }
+    .arrow { display: none; }
+    .cols { height: 180px; }
+    h1, .hero h1 { font-size: 36px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .slide.on, .radar i, .chip, .tape, .runner i, .blockchip, .arrow i, .lamps div, .led, .dot, .wing span, .cable, .strip .good, .caret, .road i.mover { animation: none; }
+    .c i, .slide.on .race i, .ring .fg, .pair i { animation: none; transform: none; width: var(--w); stroke-dashoffset: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="stage" data-look="title">
+  <header>
+    <p class="kicker">OR SENTINEL</p>
+    <nav aria-label="Story" id="dots"></nav>
+  </header>
+  <main id="deck">
+    <section class="slide on hero" data-look="title" aria-label="Title">
+      <div class="radar" aria-hidden="true"><i></i></div>
+      <p class="kicker">THE RECORD, NOT THE HEADLINE</p>
+      <h1>The black box for the sponge count.</h1>
+      <p class="lead">One station. Eight rooms. Close waits when the spoken count and the tray disagree. The chart stays here.</p>
+      <div class="chips">
+        <span class="chip safe">SAFE</span>
+        <span class="chip caution">CAUTION</span>
+        <span class="chip block">BLOCK</span>
+      </div>
+    </section>
+
+    <section class="slide" data-look="air" aria-label="Air India">
+      <div class="split">
+        <div>
+          <p class="kicker">THE STORY</p>
+          <h1>After Air India, the answer was the recorder.</h1>
+          <p class="lead left">Investigators did not need another guess. They needed the black box: a sealed record of what actually happened. An operating room needs that kind of record before anyone is harmed. This story has no casualty. The win is a close that waits, and a log that cannot be quietly rewritten.</p>
+        </div>
+        <div class="recorder" aria-hidden="true">
+          <div class="rec-top"><span>OR RECORDER</span><span class="led"></span></div>
+          <div class="window">
+            <div class="tape">
+              <div>10:02 &nbsp; sponges in &nbsp; 10</div>
+              <div>10:18 &nbsp; time-out &nbsp; done</div>
+              <div>10:41 &nbsp; sponges out &nbsp; 9</div>
+              <div>10:44 &nbsp; close requested</div>
+              <div>10:44 &nbsp; camera sees &nbsp; 9</div>
+              <div>10:44 &nbsp; BLOCK &nbsp; count short</div>
+              <div>10:44 &nbsp; line sealed</div>
+              <div>10:02 &nbsp; sponges in &nbsp; 10</div>
+              <div>10:18 &nbsp; time-out &nbsp; done</div>
+              <div>10:41 &nbsp; sponges out &nbsp; 9</div>
+              <div>10:44 &nbsp; close requested</div>
+              <div>10:44 &nbsp; camera sees &nbsp; 9</div>
+              <div>10:44 &nbsp; BLOCK &nbsp; count short</div>
+              <div>10:44 &nbsp; line sealed</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" data-look="room" aria-label="The room">
+      <p class="kicker">THE ROOM</p>
+      <h1>Sponges in. Sponges out. Then someone says close.</h1>
+      <div class="runner" aria-hidden="true"><i></i></div>
+      <ol class="steps">
+        <li><em>01</em><strong>Said out loud</strong><span>The nurse owns the count. That count stays official.</span></li>
+        <li><em>02</em><strong>Seen on the tray</strong><span>The camera counts what is actually there.</span></li>
+        <li><em>03</em><strong>Close waits</strong><span>If those two stories disagree, the wound stays open.</span></li>
+      </ol>
+      <div class="tally" aria-hidden="true">
+        <div><b>10</b><span>SAID IN</span></div>
+        <div><b class="miss">9</b><span>SEEN OUT</span></div>
+        <div class="blockchip">BLOCK</div>
+      </div>
+    </section>
+
+    <section class="slide" data-look="rule" aria-label="What it does">
+      <p class="kicker">OR SENTINEL</p>
+      <h1>The model reads. The rule locks.</h1>
+      <div class="flow">
+        <div class="node"><b>Speech</b><span>Updates sponges added and removed.</span></div>
+        <div class="arrow" aria-hidden="true"><i></i></div>
+        <div class="node"><b>Camera</b><span>Reads the tray that is actually there.</span></div>
+        <div class="arrow" aria-hidden="true"><i></i></div>
+        <div class="node"><b>Rule</b><span>The only step that can say BLOCK.</span></div>
+        <div class="lamps" aria-hidden="true">
+          <div class="s">SAFE</div>
+          <div class="c">CAUTION</div>
+          <div class="b">BLOCK</div>
+        </div>
+      </div>
+      <p class="lead">BLOCK only happens when someone has asked to close and the numbers disagree. A miss before close is only a caution.</p>
+    </section>
+
+    <section class="slide" data-look="impact" aria-label="Impact">
+      <p class="kicker">IMPACT</p>
+      <div class="stats">
+        <div class="stat"><b class="countup" data-n="8">0</b><span>rooms on one station</span></div>
+        <div class="stat"><b class="countup" data-n="1">0</b><span>sealed record of the case</span></div>
+        <div class="stat"><b>WAIT</b><span>close holds when the count is short</span></div>
+      </div>
+      <p class="lead">A short count before close is a caution. The same short count when someone asks to close is a block. No one in this story is harmed. The nurse’s count stays the official record. This is a synthetic demo, not a medical device.</p>
+    </section>
+
+    <section class="slide" data-look="comply" aria-label="Data compliance">
+      <p class="kicker">DATA COMPLIANCE</p>
+      <h1>The chart does not leave to get a count.</h1>
+      <div class="vault">
+        <div>
+          <p class="lead left">Audio, the tray photo, the sponge count, and the close stay on the box. Name, birth date, age, and record number are stripped first. The demo charts are Synthea, which are fake. SAFE, CAUTION, and BLOCK never ask the cloud.</p>
+          <p class="fine">A protocol question can leave only when every gate is on. Turn one off.</p>
+          <div class="gates" id="gates">
+            <button type="button" class="gate on" aria-pressed="true">Not urgent</button>
+            <button type="button" class="gate on" aria-pressed="true">Local model unsure</button>
+            <button type="button" class="gate on" aria-pressed="true">Link is up</button>
+            <button type="button" class="gate on" aria-pressed="true">No name or record left</button>
+          </div>
+          <div class="verdict leave" id="verdict">Stripped text may leave</div>
+        </div>
+        <div class="door open" id="door" aria-hidden="true"><i></i><span id="doorlabel">MAY LEAVE</span></div>
+      </div>
+    </section>
+
+    <section class="slide" data-look="zrt" aria-label="Why ZRT">
+      <p class="kicker">WHY ZRT</p>
+      <h1>The models run on the Nano, in the room.</h1>
+      <div class="rack">
+        <div><span class="dot"></span><b>8000</b> Qwen3 27B</div>
+        <div><span class="dot"></span><b>8001</b> Qwen2.5-VL</div>
+        <div><span class="dot"></span><b>8002</b> Detector</div>
+        <div><span class="dot"></span><b>8003</b> CountNet</div>
+        <div><span class="dot"></span><b>8004</b> ToolNet</div>
+        <div><span class="dot"></span><b>8005</b> Whisper</div>
+        <div><span class="dot"></span><b>8006</b> Language</div>
+        <div><span class="dot"></span><b>8007</b> TrayCount</div>
+      </div>
+      <div class="race" aria-hidden="true">
+        <div><span>Answer in the room</span><i style="--w:32%"></i></div>
+        <div><span>Send the room away</span><i class="long" style="--w:100%"></i></div>
+      </div>
+      <p class="fine">Each model has its own port on 100.81.221.41, so one job cannot block the others. The bars show a round trip versus staying in the room. They are not a measured time. If the Nano does not answer, a script on this machine still reads the spoken line. The close rule does not wait for ZRT.</p>
+    </section>
+
+    <section class="slide" data-look="cloud" aria-label="Why not the cloud">
+      <p class="kicker">WHY NOT THESE</p>
+      <h1>Other paths send the room away, or let the model lock it.</h1>
+      <div class="paths">
+        <div class="path no"><b>Cloud model</b><span>Adds a round trip. To answer, it would need the audio, the photo, or the chart. That is the wait and the compliance failure.</span></div>
+        <div class="path no"><b>One model for all</b><span>A language model can explain a mismatch. It must not be the lock. Only the rule can say BLOCK.</span></div>
+        <div class="path yes"><b>Nano, per port</b><span>The hackathon box. Each model is served next to the room. A laptop with no ZRT is only a booth.</span></div>
+      </div>
+      <p class="lead">The cloud is a protocol desk for a stripped, non-urgent question. It is not the sponge count, and it is not the close.</p>
+    </section>
+
+    <section class="slide" data-look="models" aria-label="Models">
+      <p class="kicker">WHAT EACH MODEL DOES</p>
+      <h1>Four lanes. The lock is not a model.</h1>
+      <div class="lanes">
+        <div class="lane see">
+          <h2>SEE</h2>
+          <p><b>8002</b> Detector. Draws a box on cotton, hands, and instruments. Already trained.</p>
+          <p><b>8003</b> CountNet. Says how many sponges. Already trained.</p>
+          <p><b>8004</b> ToolNet. Outlines the instrument. Already trained.</p>
+          <p><b>8007</b> TrayCount. Counts the photo with code.</p>
+          <p><b>8001</b> Qwen2.5-VL. Looks and answers. Fine-tune was in progress.</p>
+        </div>
+        <div class="lane hear">
+          <h2>HEAR</h2>
+          <p><b>8005</b> Whisper. Turns speech into text. Tiny model is loaded. Next set is room audio with transcripts.</p>
+        </div>
+        <div class="lane read">
+          <h2>READ</h2>
+          <p><b>8006</b> Language. Reads a spoken line today as rules.</p>
+          <p><b>8000</b> Qwen3 27B. Counter, Checklist, Critic, Scribe. Next set is instruction pairs.</p>
+        </div>
+        <div class="lane lock">
+          <h2>LOCK</h2>
+          <p><b>RULE</b> The only step that can say BLOCK. It compares numbers. It is not a model.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" data-look="metrics" aria-label="Metrics">
+      <p class="kicker">THE NUMBERS</p>
+      <h1>What each score actually means.</h1>
+      <div class="chartrow">
+        <div class="cols" role="img" aria-label="Detector 88.4 percent, recall 81.7, precision 89.3, tighter boxes 64, exact count 78.1, instrument overlap 56.7">
+          <div class="c" style="--p:88.4"><b>88.4</b><i></i><em>Found it</em></div>
+          <div class="c" style="--p:81.7"><b>81.7</b><i></i><em>Caught</em></div>
+          <div class="c" style="--p:89.3"><b>89.3</b><i></i><em>Real boxes</em></div>
+          <div class="c" style="--p:64"><b>64.0</b><i></i><em>Tight box</em></div>
+          <div class="c warm" style="--p:78.1"><b>78.1</b><i></i><em>Exact count</em></div>
+          <div class="c warm" style="--p:56.7"><b>56.7</b><i></i><em>Tool overlap</em></div>
+        </div>
+        <div class="rings">
+          <div class="ring"><svg viewBox="0 0 36 36" aria-hidden="true"><circle class="bg" cx="18" cy="18" r="15"/><circle class="fg" cx="18" cy="18" r="15"/></svg><div><b>16/16</b><span class="fine">close rules</span></div></div>
+          <div class="ring"><svg viewBox="0 0 36 36" aria-hidden="true"><circle class="bg" cx="18" cy="18" r="15"/><circle class="fg" cx="18" cy="18" r="15"/></svg><div><b>32/32</b><span class="fine">tray photos</span></div></div>
+        </div>
+      </div>
+      <div class="pub">
+        <div><b>92.5% words</b>Whisper on clean read-aloud speech. Not operating-room audio.</div>
+        <div><b>84.8% MMLU</b>Qwen3 general knowledge. Not a sponge-count test.</div>
+        <div><b>95.7% DocVQA</b>Qwen2.5-VL document reading. Not a tray count.</div>
+      </div>
+    </section>
+
+    <section class="slide" data-look="why" aria-label="Why these metrics">
+      <p class="kicker">WHY THESE NUMBERS</p>
+      <h1>The score matches the decision.</h1>
+      <div class="pairs">
+        <div class="pair"><span>Did we find it, and is the box on the object?</span><i></i><b>88.4% mAP50</b></div>
+        <div class="pair"><span>Did we miss it? About 1 in 6 still is.</span><i></i><b>81.7% recall</b></div>
+        <div class="pair"><span>Did we invent a sponge that is not there?</span><i></i><b>89.3% precision</b></div>
+        <div class="pair"><span>Is the box tight where cotton and tools overlap?</span><i></i><b>64.0% mAP50-95</b></div>
+        <div class="pair"><span>Is the sponge count exact? 25 of 32 trays.</span><i></i><b>78.1% exact</b></div>
+        <div class="pair"><span>Did the lock hold when the model was wrong?</span><i></i><b>16 / 16 rules</b></div>
+      </div>
+    </section>
+
+    <section class="slide" data-look="term" aria-label="Reproducible">
+      <p class="kicker">SOMEONE ELSE CAN RUN IT</p>
+      <h1>Public repo. Setup script. Docker.</h1>
+      <div class="term" aria-label="Commands">
+        <div><span class="ok">$</span> pip install -r requirements.txt</div>
+        <div><span class="ok">$</span> python -m unittest tests.test_sentinel -v</div>
+        <div><span class="ok">ok</span> close rules, photo counter, privacy strip</div>
+        <div><span class="ok">$</span> uvicorn app.server:app --host 0.0.0.0 --port 8501<span class="caret"></span></div>
+      </div>
+      <p class="lead">GitHub github.com/Sbnikitha/ORBLACKBOX. Detector, CountNet, ToolNet, and Whisper tiny weights are in the repo. The big tray photo sets are not. Whisper, Qwen3, and Qwen2.5-VL numbers are from the public model cards, not an operating-room rerun.</p>
+    </section>
+
+    <section class="slide" data-look="ask" aria-label="Questions">
+      <p class="kicker">ASK US THIS</p>
+      <h1>Three questions worth the time.</h1>
+      <div class="qs">
+        <div class="q"><em>01</em><div><b>Why doesn’t the AI close the room?</b><span>It only reads. The rule blocks, and only after someone asks to close and the numbers disagree.</span></div></div>
+        <div class="q"><em>02</em><div><b>What if the camera is wrong?</b><span>It will be, about 1 time in 6. Before close that is a caution. At close it is a block. The nurse’s count stays official.</span></div></div>
+        <div class="q"><em>03</em><div><b>Does the chart leave?</b><span>Not for the count. A question leaves only if it is not urgent, the local model is unsure, the link is up, and nothing identifiable remains.</span></div></div>
+      </div>
+    </section>
+
+    <section class="slide" data-look="scale" aria-label="Scale">
+      <p class="kicker">SCALE</p>
+      <h1>One box. Eight rooms. A bigger floor adds a box.</h1>
+      <div class="floor" aria-hidden="true">
+        <div class="wing"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="cable"></div>
+        <div class="nano">1 Nano<br>shared ports</div>
+        <div class="cable"></div>
+        <div class="nano2">2nd Nano<br>same code</div>
+      </div>
+      <p class="lead">Each room is a case, not a new server. The rooms share the Nano’s ports. The rule stays on the box. More rooms than one Nano can feed means a second Nano. The nurse’s count does not change.</p>
+    </section>
+
+    <section class="slide" data-look="rely" aria-label="Reliability">
+      <p class="kicker">RELIABILITY</p>
+      <h1>The lock still works when a model is quiet.</h1>
+      <div class="strips">
+        <div class="strip"><span class="lamp bad"></span><div><b>Nano not answering</b><span>A script on this machine still reads “ten in” and “close.” BLOCK does not wait for the big model.</span></div></div>
+        <div class="strip"><span class="lamp mid"></span><div><b>Camera misses one</b><span>Recall is 81.7%. A miss before close is a caution. The same miss at close is a block.</span></div></div>
+        <div class="strip"><span class="lamp good"></span><div><b>The log holds</b><span>Each line stores the fingerprint of the line before it. The 16 rule checks can be rerun from the public repo.</span></div></div>
+      </div>
+    </section>
+
+    <section class="slide" data-look="cost" aria-label="Cost">
+      <p class="kicker">PUBLISHED FIGURES</p>
+      <h1>A held close is cheaper than a return to the room.</h1>
+      <div class="money">
+        <article><b>1 / 10,000</b><span>Published rates average about one retained item in 10,000 procedures. Sponges are the item left most often.</span></article>
+        <article><b>$166k–$200k</b><span>AHRQ and The Joint Commission cite that range for one retained object, including care the hospital is not paid back for.</span></article>
+        <article class="claim"><b>$0 claimed</b><span>This demo has not saved that money. It shows one station covering eight rooms, and a close that waits.</span></article>
+      </div>
+      <p class="fine">Sources: AORN business case, about 1.07 retained items per 10,000 procedures. Joint Commission Sentinel Event Alert, Pennsylvania Patient Safety Authority figure of about $166,000, and a second figure of $200,000 or more. CMS does not pay the higher rate when the object was left during the stay.</p>
+    </section>
+
+    <section class="slide" data-look="next" aria-label="Future">
+      <p class="kicker">WHAT'S NEXT</p>
+      <h1>Train on the room. Keep the lock local.</h1>
+      <div class="road">
+        <i class="mover" aria-hidden="true"></i>
+        <div class="stop"><b>Whisper</b><span>Pair real room audio with the words that were said.</span></div>
+        <div class="stop"><b>Qwen3 27B</b><span>Instruction pairs so Counter and Checklist learn the line.</span></div>
+        <div class="stop"><b>Qwen2.5-VL</b><span>Finish the fine-tune, then score it on trays, not documents.</span></div>
+      </div>
+      <p class="lead">A hospital record comes only with an agreement. Until then the cases stay synthetic. The nurse still owns the count.</p>
+    </section>
+
+    <section class="slide" data-look="close" aria-label="Close">
+      <div class="closer">
+        <b>Close waits.</b>
+        <b>The chart stays.</b>
+        <b>The nurse owns the count.</b>
+      </div>
+      <div class="links">
+        <a href="https://github.com/Sbnikitha/ORBLACKBOX">GitHub</a>
+        <a href="https://youtube.com/shorts/uQKhbzTK_2s">Video</a>
+      </div>
+      <p class="fine">Not a medical device.</p>
+    </section>
+  </main>
+  <footer>
+    <p class="fine" id="count">1 / 18</p>
+    <div class="move">
+      <button type="button" id="prev">Previous</button>
+      <button type="button" id="next">Next</button>
+    </div>
+  </footer>
+</div>
+<script>
+const slides = [...document.querySelectorAll(".slide")];
+const dots = document.getElementById("dots");
+const stage = document.querySelector(".stage");
+let index = 0;
+slides.forEach((slide, i) => {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = String(i + 1);
+  button.setAttribute("aria-label", slide.getAttribute("aria-label"));
+  button.addEventListener("click", () => show(i));
+  dots.appendChild(button);
+});
+function show(i) {
+  index = (i + slides.length) % slides.length;
+  slides.forEach((slide, n) => slide.classList.toggle("on", n === index));
+  [...dots.children].forEach((button, n) => button.setAttribute("aria-selected", n === index ? "true" : "false"));
+  document.getElementById("count").textContent = (index + 1) + " / " + slides.length;
+  stage.dataset.look = slides[index].dataset.look || "title";
+  document.querySelectorAll(".slide.on .countup").forEach((el) => {
+    const target = Number(el.dataset.n);
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) { el.textContent = String(target); return; }
+    const start = performance.now();
+    function frame(now) {
+      const t = Math.min(1, (now - start) / 700);
+      el.textContent = String(Math.round(target * t));
+      if (t < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  });
+}
+document.getElementById("prev").addEventListener("click", () => show(index - 1));
+document.getElementById("next").addEventListener("click", () => show(index + 1));
+document.addEventListener("keydown", (event) => {
+  if (event.target.classList && event.target.classList.contains("gate")) return;
+  if (event.key === "ArrowRight" || event.key === " ") { event.preventDefault(); show(index + 1); }
+  if (event.key === "ArrowLeft") show(index - 1);
+});
+function judge() {
+  const gates = [...document.querySelectorAll(".gate")];
+  const open = gates.every((gate) => gate.classList.contains("on"));
+  const verdict = document.getElementById("verdict");
+  const door = document.getElementById("door");
+  const label = document.getElementById("doorlabel");
+  verdict.textContent = open ? "Stripped text may leave" : "Stays on the box";
+  verdict.className = "verdict " + (open ? "leave" : "stay");
+  door.className = "door " + (open ? "open" : "shut");
+  label.textContent = open ? "MAY LEAVE" : "STAYS";
+}
+document.querySelectorAll(".gate").forEach((gate) => {
+  gate.addEventListener("click", () => {
+    const on = gate.classList.toggle("on");
+    gate.setAttribute("aria-pressed", on ? "true" : "false");
+    judge();
+  });
+});
+show(0);
+</script>
+</body>
+</html>

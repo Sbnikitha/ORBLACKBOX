@@ -6,7 +6,9 @@ _PATTERNS = [
     (re.compile(r"\b\d{1,2}/\d{1,2}/\d{2,4}"), "<DATE_TIME>"),
     (re.compile(r"\b\d{4}-\d{2}-\d{2}"), "<DATE_TIME>"),
     (re.compile(r"\bMRN\s*#?\s*\d+\b", re.I), "<MEDICAL_RECORD>"),
+    (re.compile(r"\bMRN\s+[0-9a-fA-F-]{8,}\b", re.I), "<MEDICAL_RECORD>"),
     (re.compile(r"\bage\s+\d+\b", re.I), "<AGE>"),
+    (re.compile(r"Synthea patient .+?(?=,)", re.I), "<PERSON>"),
     (re.compile(r"\bPatient\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+"), "<PERSON>"),
     (re.compile(r"\b[A-Z][a-z]{2,}\s+[A-Z][a-z]{2,}\b"), "<PERSON>"),
 ]

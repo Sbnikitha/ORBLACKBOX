@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OR Sentinel — interactive pitch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #07110e;
+    --ink: #e8f7f1;
+    --muted: #9bb5ab;
+    --line: rgba(166, 255, 220, 0.18);
+    --safe: #3ee0a2;
+    --caution: #ffc14d;
+    --block: #ff4d6a;
+    --glass: rgba(8, 26, 22, 0.92);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: Sora, "Segoe UI", sans-serif; }
+  body { padding: 22px; max-width: 1100px; margin: 0 auto; }
+  a { color: var(--safe); }
+  .skip { position: absolute; left: -999px; }
+  .skip:focus { left: 12px; top: 12px; background: var(--safe); color: #062117; padding: 8px 12px; z-index: 2; }
+  header p { margin: 0; color: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: 12px; letter-spacing: 0.08em; }
+  h1 { margin: 6px 0 0; font-family: "Barlow Condensed", sans-serif; font-size: 48px; letter-spacing: 0.03em; line-height: 0.95; }
+  nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0; }
+  nav button, .move button, .qa button {
+    font: inherit; color: var(--ink); background: transparent;
+    border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; cursor: pointer;
+  }
+  nav button[aria-selected="true"], .move button:focus-visible, nav button:focus-visible, .qa button:focus-visible, input:focus-visible {
+    outline: 2px solid var(--safe); outline-offset: 2px;
+  }
+  nav button[aria-selected="true"] { background: var(--safe); color: #062117; border-color: transparent; font-weight: 600; }
+  section[hidden] { display: none; }
+  .panel { background: var(--glass); border: 1px solid var(--line); border-radius: 18px; padding: 18px; }
+  h2 { margin: 0 0 8px; font-family: "Barlow Condensed", sans-serif; font-size: 32px; letter-spacing: 0.04em; }
+  .lead, li { color: var(--muted); line-height: 1.5; }
+  .cols { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 16px; }
+  .rule { display: grid; gap: 10px; }
+  label { display: flex; justify-content: space-between; gap: 12px; align-items: center; font-size: 14px; }
+  input[type="number"] { width: 72px; background: transparent; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px; font: inherit; }
+  .status {
+    margin-top: 8px; padding: 16px; border-radius: 12px; border: 1px solid var(--line);
+    font-family: "IBM Plex Mono", monospace; letter-spacing: 0.12em;
+  }
+  .status b { display: block; font-family: "Barlow Condensed", sans-serif; font-size: 42px; letter-spacing: 0.06em; }
+  .status.SAFE { color: var(--safe); }
+  .status.CAUTION { color: var(--caution); }
+  .status.BLOCK { color: var(--block); }
+  .status span { display: block; margin-top: 6px; letter-spacing: 0; font-family: Sora, sans-serif; color: var(--ink); font-size: 14px; }
+  svg { width: 100%; height: auto; }
+  .arch-t { fill: var(--ink); font-family: "Barlow Condensed", sans-serif; font-size: 16px; }
+  .arch-s { fill: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: 10px; }
+  .node { fill: #0c1c18; stroke: var(--safe); }
+  .node.rule { stroke: var(--caution); }
+  .node.lock { stroke: var(--block); }
+  .flow { fill: none; stroke: var(--safe); stroke-width: 2; stroke-dasharray: 6 8; animation: dash 1.4s linear infinite; }
+  .flow.gold { stroke: var(--caution); }
+  @keyframes dash { to { stroke-dashoffset: -28; } }
+  @media (prefers-reduced-motion: reduce) { .flow { animation: none; } }
+  .bars { display: grid; gap: 12px; }
+  .bar { display: grid; grid-template-columns: 180px 1fr 72px; gap: 10px; align-items: center; font-size: 13px; }
+  .track { height: 10px; background: rgba(255,255,255,0.08); border-radius: 99px; overflow: hidden; }
+  .track i { display: block; height: 100%; background: var(--safe); }
+  .track i.warn { background: var(--caution); }
+  .num { font-family: "IBM Plex Mono", monospace; text-align: right; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; letter-spacing: 0.06em; }
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .card { border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+  .card b { display: block; font-family: "Barlow Condensed", sans-serif; font-size: 28px; }
+  .qa button { width: 100%; text-align: left; border-radius: 12px; margin-top: 8px; }
+  .qa p { margin: 8px 0 0; color: var(--ink); }
+  .move { display: flex; justify-content: space-between; margin-top: 14px; }
+  .fine { color: var(--muted); font-size: 12px; }
+  @media (max-width: 800px) {
+    h1 { font-size: 36px; }
+    .cols, .cards, .bar { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#panel">Skip to the current section</a>
+<header>
+  <p>OR SENTINEL · HP EDGE AI · SJSU</p>
+  <h1>Hold the close until the count matches.</h1>
+</header>
+<nav aria-label="Pitch sections">
+  <button type="button" id="tab-problem" aria-controls="problem" aria-selected="true">Problem</button>
+  <button type="button" id="tab-solution" aria-controls="solution" aria-selected="false">Solution</button>
+  <button type="button" id="tab-architecture" aria-controls="architecture" aria-selected="false">Architecture</button>
+  <button type="button" id="tab-evidence" aria-controls="evidence" aria-selected="false">Evidence</button>
+  <button type="button" id="tab-impact" aria-controls="impact" aria-selected="false">Impact</button>
+  <button type="button" id="tab-questions" aria-controls="questions" aria-selected="false">Questions</button>
+</nav>
+<main id="panel">
+  <section id="problem" aria-labelledby="tab-problem">
+    <div class="panel">
+      <h2>The close depends on a spoken count.</h2>
+      <p class="lead">Before the wound is closed, the circulating nurse reconciles sponges that went in with sponges that came out. A sponge still in the field and a tray that was misread are both ways that close happens too early. One nurse may be covering more than one room. OR Sentinel does not replace that count. It refuses to treat a mismatch as a clean close.</p>
+      <div class="cards">
+        <article class="card"><b>8</b><span>Rooms on one station</span></article>
+        <article class="card"><b>1</b><span>Rule that can say BLOCK</span></article>
+        <article class="card"><b>0</b><span>Charts sent off the box by default</span></article>
+      </div>
+    </div>
+  </section>
+  <section id="solution" aria-labelledby="tab-solution" hidden>
+    <div class="panel cols">
+      <div>
+        <h2>Speech, camera, then a rule.</h2>
+        <p class="lead">Speech updates sponges added, sponges removed, and whether the time-out was said. The camera counts the tray. BLOCK is allowed only when someone asks to close and the spoken count, the camera, or a tool still inside disagree. Move the numbers. The status is the same rule as the operating-room floor.</p>
+      </div>
+      <form class="rule" id="rule">
+        <label>Sponges in <input id="added" type="number" min="0" max="40" value="10" /></label>
+        <label>Sponges out <input id="removed" type="number" min="0" max="40" value="10" /></label>
+        <label>Camera on the tray <input id="camera" type="number" min="0" max="40" value="9" /></label>
+        <label>Close requested <input id="close" type="checkbox" /></label>
+        <label>Time-out said <input id="timeout" type="checkbox" checked /></label>
+        <div class="status CAUTION" id="status" role="status" aria-live="polite"><b>CAUTION</b><span></span></div>
+      </form>
+    </div>
+  </section>
+  <section id="architecture" aria-labelledby="tab-architecture" hidden>
+    <div class="panel">
+      <h2>Models read. The rule decides.</h2>
+      <p class="lead">Each box is one model and one port on 100.81.221.41. Packets move from the room to the count, then from the count to the lock. The critic explains the lock. It does not choose it.</p>
+      <svg viewBox="0 0 980 280" role="img" aria-labelledby="archTitle archDesc">
+        <title id="archTitle">OR Sentinel architecture</title>
+        <desc id="archDesc">Room audio goes to Whisper on port 8005, then to Counter and Checklist on port 8000. The tray photo goes to the detector on port 8002, CountNet on 8003, and ToolNet on 8004. Those outputs feed the rules engine, which is the only step that can set BLOCK. The critic writes one sentence. The hash ledger stores the result on the box.</desc>
+        <rect class="node" x="20" y="30" width="150" height="70" rx="10" />
+        <text class="arch-t" x="95" y="58" text-anchor="middle">Room</text>
+        <text class="arch-s" x="95" y="78" text-anchor="middle">audio + tray</text>
+        <rect class="node" x="230" y="20" width="170" height="64" rx="10" />
+        <text class="arch-t" x="315" y="46" text-anchor="middle">Whisper</text>
+        <text class="arch-s" x="315" y="64" text-anchor="middle">:8005 words</text>
+        <rect class="node" x="230" y="110" width="170" height="64" rx="10" />
+        <text class="arch-t" x="315" y="136" text-anchor="middle">Detector</text>
+        <text class="arch-s" x="315" y="154" text-anchor="middle">:8002 boxes</text>
+        <rect class="node" x="450" y="20" width="190" height="64" rx="10" />
+        <text class="arch-t" x="545" y="46" text-anchor="middle">Counter</text>
+        <text class="arch-s" x="545" y="64" text-anchor="middle">:8000 in / out</text>
+        <rect class="node" x="450" y="110" width="190" height="64" rx="10" />
+        <text class="arch-t" x="545" y="136" text-anchor="middle">CountNet + ToolNet</text>
+        <text class="arch-s" x="545" y="154" text-anchor="middle">:8003 :8004</text>
+        <rect class="node rule" x="700" y="60" width="120" height="74" rx="10" />
+        <text class="arch-t" x="760" y="90" text-anchor="middle">Rules</text>
+        <text class="arch-s" x="760" y="110" text-anchor="middle">SAFE CAUTION</text>
+        <rect class="node lock" x="850" y="60" width="110" height="74" rx="10" />
+        <text class="arch-t" x="905" y="90" text-anchor="middle">BLOCK</text>
+        <text class="arch-s" x="905" y="110" text-anchor="middle">on the box</text>
+        <path class="flow" d="M170 55 H230" />
+        <path class="flow" d="M170 75 H210 V142 H230" />
+        <path class="flow" d="M400 52 H450" />
+        <path class="flow" d="M400 142 H450" />
+        <path class="flow gold" d="M640 52 H670 V97 H700" />
+        <path class="flow gold" d="M640 142 H670 V107 H700" />
+        <path class="flow gold" d="M820 97 H850" />
+      </svg>
+      <p class="fine">Qwen2.5-VL is port 8001. The language stand-in is port 8006 and TrayCount is port 8007, used when the Nano port does not answer. Patient charts are Synthea records and are stripped before anything can leave.</p>
+    </div>
+  </section>
+  <section id="evidence" aria-labelledby="tab-evidence" hidden>
+    <div class="panel">
+      <h2>The numbers that match the decision.</h2>
+      <p class="lead">Recall is here because a missed sponge is the failure that matters. Exact count is here because the rule compares integers. The 16 checks are here because a model score does not lock the room.</p>
+      <div class="bars" aria-label="Benchmark scores scaled from 0 to 1">
+        <div class="bar"><span>Detector recall</span><div class="track"><i style="width:81.7%"></i></div><span class="num">0.817</span></div>
+        <div class="bar"><span>Detector mAP50</span><div class="track"><i style="width:88.4%"></i></div><span class="num">0.884</span></div>
+        <div class="bar"><span>Detector mAP50-95</span><div class="track"><i style="width:64%"></i></div><span class="num">0.640</span></div>
+        <div class="bar"><span>CountNet exact</span><div class="track"><i class="warn" style="width:78.1%"></i></div><span class="num">25/32</span></div>
+        <div class="bar"><span>ToolNet IoU</span><div class="track"><i class="warn" style="width:56.7%"></i></div><span class="num">0.567</span></div>
+        <div class="bar"><span>Fusion checks</span><div class="track"><i style="width:100%"></i></div><span class="num">16/16</span></div>
+      </div>
+      <table>
+        <caption class="fine">Detector checkpoint is epoch 39 of 40, the best fitness on 7,201 train and 341 valid composite trays. CountNet MAE is 0.219. ToolNet test set is 89 Kvasir frames.</caption>
+        <thead><tr><th>Measure</th><th>Value</th><th>Why it is the one we show</th></tr></thead>
+        <tbody>
+          <tr><td>Precision</td><td>0.893</td><td>A false sponge can hold a close the nurse already reconciled.</td></tr>
+          <tr><td>Recall</td><td>0.817</td><td>About one in six labeled objects is still missed. The nurse’s count stays official.</td></tr>
+          <tr><td>mAP50-95</td><td>0.640</td><td>This fitness selected the checkpoint, because overlapping cotton needs a tight box.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section id="impact" aria-labelledby="tab-impact" hidden>
+    <div class="panel">
+      <h2>Eight rooms. The chart stays here.</h2>
+      <div class="cards">
+        <article class="card"><b>One station</b><span>Watches the floor instead of asking each nurse to be the only camera.</span></article>
+        <article class="card"><b>Close waits</b><span>A short count at close is BLOCK. The same miss before close is only CAUTION.</span></article>
+        <article class="card"><b>Data stays</b><span>Urgent, confident, offline, or still identifiable questions never leave the box.</span></article>
+      </div>
+      <p class="lead">What this does not change: the circulating nurse owns the count. These are acted lines and composite trays. Qwen3 27B and Qwen2.5-VL are pulled, not fine-tuned for this task. This is not a medical device.</p>
+    </div>
+  </section>
+  <section id="questions" aria-labelledby="tab-questions" hidden>
+    <div class="panel qa">
+      <h2>Three minutes of questions.</h2>
+      <p class="lead">Open an answer, or go back to Solution and move the camera count.</p>
+      <button type="button" aria-expanded="false" aria-controls="a1">Is this a medical device?</button>
+      <p id="a1" hidden>No. Synthetic cases and composite trays. The nurse’s count stays the official record.</p>
+      <button type="button" aria-expanded="false" aria-controls="a2">Why doesn’t the 27B decide BLOCK?</button>
+      <p id="a2" hidden>It can explain a mismatch. The lock is app/fusion.py: a requested close, plus a spoken mismatch, a camera mismatch, or a tool still inside.</p>
+      <button type="button" aria-expanded="false" aria-controls="a3">What if the detector is wrong?</button>
+      <p id="a3" hidden>Recall is 0.817 on the valid composites. A camera miss before close stays CAUTION. BLOCK still needs someone to ask to close.</p>
+      <button type="button" aria-expanded="false" aria-controls="a4">Where does the chart go?</button>
+      <p id="a4" hidden>Synthea, fake records. Name, birth date, age, and record number are stripped. Anything left over stays on the box.</p>
+    </div>
+  </section>
+</main>
+<div class="move">
+  <button type="button" id="prev">Previous</button>
+  <button type="button" id="next">Next</button>
+</div>
+<p class="fine">Synthetic acted cases and generated trays. Not a medical device. Not for clinical use.</p>
+<script>
+const order = ["problem", "solution", "architecture", "evidence", "impact", "questions"];
+let index = 0;
+function show(i) {
+  index = (i + order.length) % order.length;
+  order.forEach((id, n) => {
+    const on = n === index;
+    document.getElementById(id).hidden = !on;
+    const tab = document.getElementById("tab-" + id);
+    tab.setAttribute("aria-selected", on ? "true" : "false");
+    if (on) tab.focus();
+  });
+}
+order.forEach((id, n) => {
+  document.getElementById("tab-" + id).addEventListener("click", () => show(n));
+});
+document.getElementById("prev").addEventListener("click", () => show(index - 1));
+document.getElementById("next").addEventListener("click", () => show(index + 1));
+document.addEventListener("keydown", (event) => {
+  const tag = event.target && event.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA") return;
+  if (event.key === "ArrowRight") show(index + 1);
+  if (event.key === "ArrowLeft") show(index - 1);
+});
+function judge() {
+  const added = Number(document.getElementById("added").value);
+  const removed = Number(document.getElementById("removed").value);
+  const camera = Number(document.getElementById("camera").value);
+  const close = document.getElementById("close").checked;
+  const timeout = document.getElementById("timeout").checked;
+  const notes = [];
+  if (camera !== removed) notes.push("Camera sees " + camera + ", nurse counted " + removed + " out.");
+  if (!timeout) notes.push("Time-out not said.");
+  if (close && added !== removed) notes.push(added + " in, " + removed + " out.");
+  let status = "SAFE";
+  if (close && (added !== removed || camera !== removed)) status = "BLOCK";
+  else if (notes.length) status = "CAUTION";
+  const box = document.getElementById("status");
+  box.className = "status " + status;
+  box.querySelector("b").textContent = status;
+  box.querySelector("span").textContent = notes.join(" ") || "Count matches and the time-out was said.";
+}
+document.getElementById("rule").addEventListener("input", judge);
+judge();
+document.querySelectorAll(".qa button").forEach((button) => {
+  button.addEventListener("click", () => {
+    const panel = document.getElementById(button.getAttribute("aria-controls"));
+    const open = button.getAttribute("aria-expanded") === "true";
+    button.setAttribute("aria-expanded", open ? "false" : "true");
+    panel.hidden = open;
+  });
+});
+</script>
+</body>
+</html>

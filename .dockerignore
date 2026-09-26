@@ -1,0 +1,10 @@
+.venv
+.git
+state
+runs
+**/__pycache__
+*.zip
+data/external
+data/yolo
+data/realistic
+data/train_tail.txt

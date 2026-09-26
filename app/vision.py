@@ -11,14 +11,16 @@ import config
 import photos
 
 LAST = {"backend": "traycount", "ms": 0.0}
+_REMOTE_DOWN = False
 
 
 def count_tray(path, force=False):
     """Return (count or None, seconds). Raises if the camera agent is cut and force is false."""
     if not force and os.path.exists(config.VISION_DOWN):
         raise ConnectionError("vision model offline")
+    global _REMOTE_DOWN
     started = time.perf_counter()
-    if str(config.VLM_URL).startswith("http"):
+    if str(config.VLM_URL).startswith("http") and not _REMOTE_DOWN:
         try:
             mime = "image/png" if str(path).lower().endswith(".png") else "image/jpeg"
             with open(path, "rb") as handle:
@@ -44,6 +46,7 @@ def count_tray(path, force=False):
             LAST.update(backend="zrt-vision", ms=round((time.perf_counter() - started) * 1000, 1))
             return count, time.perf_counter() - started
         except (urllib.error.URLError, TimeoutError, OSError, KeyError, json.JSONDecodeError):
+            _REMOTE_DOWN = True
             if not config.ALLOW_FALLBACK:
                 raise
     count = photos.count_image(path)

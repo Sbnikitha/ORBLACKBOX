@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OR Sentinel — benchmarks</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+  :root { --bg:#07110e; --ink:#e8f7f1; --muted:#8eaaa0; --line:rgba(166,255,220,.18); --safe:#3ee0a2; --caution:#ffc14d; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; color: var(--ink);
+    font-family: Sora, "Segoe UI", sans-serif; background: var(--bg);
+    padding: 28px 32px 40px;
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(800px 320px at 0% 0%, rgba(62,224,162,.16), transparent 55%),
+      linear-gradient(rgba(150,255,214,.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(150,255,214,.04) 1px, transparent 1px);
+    background-size: auto, 42px 42px, 42px 42px;
+  }
+  main { position: relative; max-width: 1080px; margin: 0 auto; }
+  p.kicker { margin: 0; font-family: "IBM Plex Mono", monospace; letter-spacing: .14em; font-size: 12px; color: var(--safe); }
+  h1 { margin: 8px 0 6px; font-family: "Barlow Condensed", sans-serif; font-size: 64px; line-height: .9; letter-spacing: .03em; }
+  .lead { color: var(--muted); max-width: 640px; margin: 0 0 22px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  article {
+    border: 1px solid var(--line); border-radius: 18px; padding: 16px 16px 14px;
+    background: rgba(8,26,22,.88); opacity: 0; transform: translateY(12px);
+    animation: rise .7s ease forwards;
+  }
+  article:nth-child(1) { animation-delay: .04s; grid-column: span 2; }
+  article:nth-child(2) { animation-delay: .08s; }
+  article:nth-child(3) { animation-delay: .12s; }
+  article:nth-child(4) { animation-delay: .16s; }
+  article:nth-child(5) { animation-delay: .2s; }
+  article:nth-child(6) { animation-delay: .24s; }
+  article:nth-child(7) { animation-delay: .28s; }
+  article:nth-child(8) { animation-delay: .32s; }
+  article:nth-child(9) { animation-delay: .36s; }
+  article:nth-child(10) { animation-delay: .4s; }
+  article:nth-child(11) { animation-delay: .44s; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  .name { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--muted); letter-spacing: .08em; }
+  .value { font-family: "Barlow Condensed", sans-serif; font-size: 56px; line-height: .9; margin: 8px 0 4px; color: var(--safe); }
+  article.mid .value { color: var(--caution); }
+  article.hero .value { font-size: 92px; }
+  article.open { grid-column: span 2; }
+  .why { color: var(--ink); font-size: 14px; min-height: 2.6em; }
+  .track { margin-top: 14px; height: 8px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; }
+  .track i { display: block; height: 100%; width: 0; background: var(--safe); border-radius: 99px; animation: fill 1.3s cubic-bezier(.2,.8,.2,1) forwards; }
+  article.mid .track i { background: var(--caution); }
+  @keyframes fill { to { width: var(--w); } }
+  .value.quiet { color: var(--muted); font-size: 40px; letter-spacing: .02em; }
+  .fine { margin-top: 16px; color: var(--muted); font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 28px; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-size: 12px; letter-spacing: .08em; font-weight: 500; }
+  h2 { margin: 28px 0 0; font-family: "Barlow Condensed", sans-serif; font-size: 32px; letter-spacing: .04em; }
+  @media (max-width: 800px) {
+    h1 { font-size: 42px; }
+    .grid, article:nth-child(1), article.open { grid-template-columns: 1fr; grid-column: auto; }
+    article.hero .value { font-size: 72px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    article, .track i { animation: none; opacity: 1; transform: none; width: var(--w); }
+  }
+</style>
+</head>
+<body>
+<main>
+  <p class="kicker">OR SENTINEL · WHY THESE NUMBERS</p>
+  <h1>See the tray. Then hold the close.</h1>
+  <p class="lead">Recall is here because a missed sponge is the failure that matters. Exact count is here because the rule compares integers. The 16 checks are here because a model score does not lock the room.</p>
+  <div class="grid">
+    <article class="hero">
+      <div class="name">COMBINED YOLO · mAP50</div>
+      <div class="value" data-count="88.4" data-suffix="%">0%</div>
+      <div class="why">Epoch 39 of 40. Best checkpoint on 7,201 composite trays. This is the “did we find it” score.</div>
+      <div class="track"><i style="--w:88.4%"></i></div>
+    </article>
+    <article>
+      <div class="name">DETECTOR RECALL</div>
+      <div class="value" data-count="81.7" data-suffix="%">0%</div>
+      <div class="why">About one in six objects is still missed. The nurse’s count stays official.</div>
+      <div class="track"><i style="--w:81.7%"></i></div>
+    </article>
+    <article class="mid">
+      <div class="name">COUNTNET EXACT</div>
+      <div class="value" data-count="78.1" data-suffix="%">0%</div>
+      <div class="why">25 of 32 held-out trays. Off by one sponge is enough to block.</div>
+      <div class="track"><i style="--w:78.1%"></i></div>
+    </article>
+    <article>
+      <div class="name">DETECTOR PRECISION</div>
+      <div class="value" data-count="89.3" data-suffix="%">0%</div>
+      <div class="why">A false sponge can hold a close the nurse already reconciled.</div>
+      <div class="track"><i style="--w:89.3%"></i></div>
+    </article>
+    <article class="mid">
+      <div class="name">DETECTOR mAP50-95</div>
+      <div class="value" data-count="64.0" data-suffix="%">0%</div>
+      <div class="why">This fitness picked the checkpoint. Tight boxes when cotton overlaps tools.</div>
+      <div class="track"><i style="--w:64%"></i></div>
+    </article>
+    <article class="mid">
+      <div class="name">TOOLNET MASK IOU</div>
+      <div class="value" data-count="56.7" data-suffix="%">0%</div>
+      <div class="why">89 Kvasir frames. A box, not a decision that the tool is inside.</div>
+      <div class="track"><i style="--w:56.7%"></i></div>
+    </article>
+    <article>
+      <div class="name">TRAYCOUNT</div>
+      <div class="value" data-count="32" data-suffix="/32">0</div>
+      <div class="why">Exact on the drawn demo photos. A different counter from CountNet.</div>
+      <div class="track"><i style="--w:100%"></i></div>
+    </article>
+    <article>
+      <div class="name">FUSION RULES</div>
+      <div class="value" data-count="16" data-suffix="/16">0</div>
+      <div class="why">SAFE, CAUTION, and BLOCK on the acted cases. This is the lock.</div>
+      <div class="track"><i style="--w:100%"></i></div>
+    </article>
+    <article class="mid open">
+      <div class="name">WHISPER TINY</div>
+      <div class="value" data-count="92.5" data-suffix="%">0%</div>
+      <div class="why">Port 8005. 92.5% words from a 7.54% LibriSpeech-clean word error. Next set is room audio paired with transcripts.</div>
+      <div class="track"><i style="--w:92.5%"></i></div>
+    </article>
+    <article class="mid open">
+      <div class="name">QWEN3 27B</div>
+      <div class="value" data-count="84.8" data-suffix="%">0%</div>
+      <div class="why">Port 8000. 84.8% MMLU. Pulled for Counter, Checklist, Critic, and Scribe. Next set is instruction pairs.</div>
+      <div class="track"><i style="--w:84.8%"></i></div>
+    </article>
+    <article class="mid open">
+      <div class="name">QWEN2.5-VL</div>
+      <div class="value" data-count="95.7" data-suffix="%">0%</div>
+      <div class="why">Port 8001. 95.7% DocVQA. Fine-tune was in progress at the last check.</div>
+      <div class="track"><i style="--w:95.7%"></i></div>
+    </article>
+  </div>
+  <h2>Inference ports</h2>
+  <p class="fine">Host 100.81.221.41. One port per model.</p>
+  <table>
+    <thead><tr><th>Entry</th><th>Port</th><th>Training status</th></tr></thead>
+    <tbody>
+      <tr><td>Detector</td><td>8002</td><td>Already trained</td></tr>
+      <tr><td>CountNet</td><td>8003</td><td>Already trained</td></tr>
+      <tr><td>ToolNet</td><td>8004</td><td>Already trained</td></tr>
+      <tr><td>Whisper</td><td>8005</td><td>Pretrained tiny is loaded. Next set is room audio paired with transcripts.</td></tr>
+      <tr><td>Language</td><td>8006</td><td>Live now as a rules reader for spoken lines.</td></tr>
+      <tr><td>TrayCount</td><td>8007</td><td>Live now as counting code on the tray photo.</td></tr>
+      <tr><td>Qwen3 27B</td><td>8000</td><td>Pulled for Counter, Checklist, Critic, and Scribe. Next set is instruction pairs.</td></tr>
+      <tr><td>Qwen2.5-VL</td><td>8001</td><td>Fine-tune was in progress at the last check.</td></tr>
+    </tbody>
+  </table>
+  <p class="fine">Source: runs/detect/runs/combined-new/results.csv epoch 39 · models/report.json · app/selftest.py. Synthetic and composite trays. Not a medical device.</p>
+</main>
+<script>
+document.querySelectorAll("[data-count]").forEach((node) => {
+  const end = Number(node.dataset.count);
+  const suffix = node.dataset.suffix || "";
+  const decimals = String(node.dataset.count).includes(".") ? 1 : 0;
+  const start = performance.now();
+  const dur = 1100;
+  function tick(now) {
+    const t = Math.min(1, (now - start) / dur);
+    const eased = 1 - Math.pow(1 - t, 3);
+    const value = end * eased;
+    node.textContent = (decimals ? value.toFixed(decimals) : Math.round(value)) + suffix;
+    if (t < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+});
+</script>
+</body>
+</html>

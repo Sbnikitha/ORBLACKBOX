@@ -1,0 +1,32 @@
+OR Sentinel storyline
+Do not say lives were lost. The point is the record, and the close that waits.
+
+The story
+
+After the Air India crash, the question everyone needed answered was not a guess from the news. It was what the black box recorded. The recorder is what makes the event reconstructable.
+
+An operating room needs the same kind of record, without waiting for a disaster. Sponges go in. Sponges come out. Someone asks to close. If those numbers disagree, close waits. Later, if anyone asks what happened, the sealed log is the answer: what was said, what the camera saw, and why the room was SAFE, CAUTION, or BLOCK.
+
+No one in this story is harmed. The win is that the mismatch is caught before close, and the record cannot be quietly rewritten.
+
+Say this
+
+In aviation, the black box is how you know what happened. In the operating room, OR Sentinel is that box for the sponge count. One station, eight rooms. Speech tracks sponges in and out. The camera reads the tray. A rule, not the model, holds the close when they disagree. The nurse's count stays official. The log is the record.
+
+Data compliance
+
+The chart does not leave the building to get a count.
+
+Patient questions stay on the box unless every one of these is true: the question is not urgent, the local model is unsure, the link is up, and a second check finds no name, birth date, age, or record number left. The demo uses Synthea, which is fake records. Names and record numbers are stripped before anything can be sent. Urgent, confident, offline, or still identifiable questions are never sent.
+
+The close decision itself does not use the cloud at all. Added, removed, camera count, and the checklist stay on the box. The hash chain stores that decision on the box.
+
+Why ZRT
+
+ZRT is how the models run on the Nano, in the room, instead of in a remote data center.
+
+Each model has its own port on 100.81.221.41. Qwen3 27B is 8000. Qwen2.5-VL is 8001. The detector is 8002. CountNet 8003. ToolNet 8004. Whisper 8005. The language reader is 8006. TrayCount is 8007.
+
+Latency is why that matters. A spoken line and a tray photo have to come back while the case is still open. A cloud round trip adds wait, and it would mean sending the room's audio or the chart off the box to get an answer. ZRT keeps that inference local, so the count check is fast and the identifiable record stays here.
+
+The rule that says BLOCK does not wait on ZRT. If a model port is down, a small local reader still updates the count. The lock is the rule either way.

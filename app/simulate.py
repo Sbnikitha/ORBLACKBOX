@@ -15,7 +15,47 @@ import config
 import fusion
 import ledger
 import photos
+import synthea
 import vision
+
+
+_COMPOSITES = None
+
+
+def _composite_pool():
+    """Synthetic demo photos from data/composites/train, grouped by sponge count."""
+    global _COMPOSITES
+    if _COMPOSITES is not None:
+        return _COMPOSITES
+    root = Path(config.DATA_DIR) / "composites" / "train"
+    buckets = {}
+    if root.is_dir():
+        for path in sorted(root.glob("*.json")):
+            try:
+                record = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            image = path.with_suffix(".jpg")
+            if not image.is_file():
+                continue
+            count = int(record.get("sponge_count") or 0)
+            boxes = []
+            for item in (record.get("sponges") or []) + (record.get("instruments") or []):
+                boxes.append({
+                    "x": item["x"], "y": item["y"], "w": item["w"], "h": item["h"],
+                    "kind": item.get("kind") or "sponge",
+                    "label": item.get("label") or "item",
+                })
+            buckets.setdefault(count, []).append({
+                "rel": image.name,
+                "url": "/media/synth/" + image.name,
+                "width": 640,
+                "height": 480,
+                "boxes": boxes,
+                "count": count,
+            })
+    _COMPOSITES = buckets
+    return buckets
 
 
 def photo_with(count):
@@ -32,13 +72,36 @@ def photo_with(count):
     return random.choice(hits) if hits else None
 
 
+def _apply_composite(state, count):
+    """Swap only the picture. The count and the rules stay on the synthetic reading."""
+    pool = _composite_pool().get(int(count))
+    if not pool:
+        return
+    frame = random.choice(pool)
+    state["photo"] = frame["rel"]
+    state["photo_url"] = frame["url"]
+    boxes = []
+    inside = [name.lower() for name in (state.get("tools_inside") or [])]
+    for box in frame["boxes"]:
+        item = dict(box)
+        label = (item.get("label") or "").lower()
+        if item["kind"] == "instrument" and inside and any(name in label for name in inside):
+            item["kind"] = "missing"
+            item["label"] = f"{item.get('label')} MISSING"
+        boxes.append(item)
+    state["boxes"] = boxes
+    state["frame_w"] = frame["width"]
+    state["frame_h"] = frame["height"]
+
+
 def _look(state, hidden_problem, force_vision):
-    """Keep a tray frame for every moment, and flag tools that are still inside."""
+    """Tray frame for this moment. Synthetic photos, unless this case asked for composites."""
     on_tray = max(state["removed"] - (1 if hidden_problem else 0), 0)
     photo = photo_with(on_tray)
     if not photo:
         return
     state["photo"] = os.path.basename(photo)
+    state["photo_url"] = "/media/photos/" + state["photo"]
     try:
         marked = photos.analyze(photo)
         state["vision_count"], _ = vision.count_tray(photo, force=force_vision)
@@ -59,6 +122,9 @@ def _look(state, hidden_problem, force_vision):
         state["vision_count"] = None
         state["boxes"] = []
         state["mode"] = "AUDIO ONLY - camera agent down"
+        return
+    if state.get("pictures") == "demo":
+        _apply_composite(state, on_tray)
 
 
 def _phase(state):
@@ -104,7 +170,8 @@ def _sleep(seconds, stop):
 
 def run_or(or_id, script, speed=4, hidden_problem=False, instant=False, persist=True,
            record_ledger=True, force_vision=False, stop=None, guard=None, script_name=None,
-           procedure=None, scenario="complete", hold_tools=False):
+           procedure=None, scenario="complete", hold_tools=False, pictures="synthetic",
+           chart=None):
     if isinstance(script, (list, tuple)):
         lines = list(script)
         name = script_name or "or1.json"
@@ -112,6 +179,7 @@ def run_or(or_id, script, speed=4, hidden_problem=False, instant=False, persist=
         name = os.path.basename(script)
         with open(script, encoding="utf-8") as handle:
             lines = json.load(handle)
+    lines = synthea.bind(lines, chart)
     state = {
         "or": or_id,
         "script": name,
@@ -123,6 +191,7 @@ def run_or(or_id, script, speed=4, hidden_problem=False, instant=False, persist=
         "removed": 0,
         "vision_count": None,
         "photo": None,
+        "pictures": "demo" if pictures == "demo" else "synthetic",
         "mode": "audio + camera",
         "checklist": [],
         "close_requested": False,
@@ -150,6 +219,7 @@ def run_or(or_id, script, speed=4, hidden_problem=False, instant=False, persist=
         "scenario": scenario,
         "monitor_alert": "Case delayed after time-out. Incision has not started." if scenario == "delay" else "",
         "patient_log": [],
+        "chart": chart,
         "glucose": 108,
         "vitals": {"hr": 74, "sys": 118, "dia": 72, "spo2": 99, "rr": 14, "phase": "SIGN IN"},
         "phase": "PRE-TIMEOUT",
@@ -298,6 +368,7 @@ def run_or(or_id, script, speed=4, hidden_problem=False, instant=False, persist=
             "text": line["text"],
             "kind": kind,
             "photo": state.get("photo"),
+            "photo_url": state.get("photo_url"),
             "boxes": [dict(box) for box in (state.get("boxes") or [])],
             "alerts": list(state.get("alerts") or []),
             "frame_w": state.get("frame_w") or 480,
