@@ -1,0 +1,78 @@
+OR Sentinel models. Paths are from the project folder.
+
+TRAINED. Weights are in this repo.
+
+Detector
+  Job: cotton, hands, and instruments on one tray
+  Weight: nano/weights/detector.pt
+  Same training result: runs/detect/runs/combined-new/weights/best.pt
+  Train: python nano/nano_train.py
+  Dataset: data/composites_real
+  Infer: python nano/infer.py path\to\tray.jpg
+
+CountNet
+  Job: sponge count
+  Weight: others/weights/count.pt
+  App copy: models/count.pt
+  Train: python others/train.py
+  Dataset: generated trays from app/photos.py
+  Infer: python others/infer.py path\to\image.jpg
+
+ToolNet
+  Job: instrument outline
+  Weight: others/weights/tool.pt
+  App copy: models/tool.pt
+  Train: python others/train.py
+  Dataset: data/external/kvasir-instrument
+  Infer: python others/infer.py path\to\image.jpg
+
+NOT TRAINED YET. Script is in this repo. Weight is not.
+
+IGauze detector
+  Train: python nano/later_igauze.py
+  Dataset: data/external/igauze
+  Weight after training: runs/detect/runs/igauze/weights/best.pt
+
+HOSPI detector
+  Train: python nano/later_hospi.py
+  Dataset: data/external/hospi/HOSPI_Tools_small_yolov5
+  Weight after training: runs/detect/runs/hospi/weights/best.pt
+
+Vision fine-tune
+  Name: Qwen/Qwen2.5-VL-7B-Instruct
+  Train: bash nano/train_on_nano.sh
+  Data builder: python nano/prepare_zrt_data.py
+  Dataset: HOSPI photos written to data/zrt/train.jsonl
+  Serve after training: bash nano/serve_zrt.sh
+  Infer: python nano/infer_vlm.py path\to\tray.jpg
+
+PULLED, NOT TRAINED. Inference on the Nano. Weights are not stored in this folder.
+
+Language model
+  Name: Inferact/Qwen3.8-27B-NVFP4
+  Job: Counter, Checklist, Critic, Scribe
+  Start: bash nano/serve_zrt.sh
+  Port: 8000
+  Infer: python nano/infer_llm.py "Adding five sponges."
+
+Vision model before the fine-tune
+  Name: Qwen/Qwen2.5-VL-7B-Instruct
+  Start: bash nano/serve_zrt.sh
+  Port: 8001
+  Infer: python nano/infer_vlm.py path\to\tray.jpg
+
+Whisper tiny
+  Job: wav to text
+  Weight: nano/weights/whisper/tiny.pt
+  Infer: python nano/infer_whisper.py path\to\line.wav
+  The live app does not call this file yet.
+
+CODE, NOT A WEIGHT FILE.
+
+Counter, Checklist, Critic, Scribe
+  Live case when the 27B is off: app/local_model.py
+  Paste-on-Nano copy: python others/infer_language.py "Adding five sponges."
+
+TrayCount
+  Live camera sponge count when the vision model is off: app/photos.py
+  Function: count_image
