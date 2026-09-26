@@ -1,0 +1,114 @@
+[
+ {
+  "t": 0.0,
+  "text": "Let's do a time out."
+ },
+ {
+  "t": 2.4,
+  "text": "Patient is John Doe, date of birth confirmed."
+ },
+ {
+  "t": 4.8,
+  "text": "Laparoscopic appendectomy. Right side, site marked and confirmed."
+ },
+ {
+  "t": 7.6,
+  "text": "No known allergies."
+ },
+ {
+  "t": 10.0,
+  "text": "Adding five sponges."
+ },
+ {
+  "t": 12.4,
+  "text": "Adding five sponges."
+ },
+ {
+  "t": 14.8,
+  "text": "Scalpel please."
+ },
+ {
+  "t": 17.4,
+  "text": "Incision is open. We are in the abdomen."
+ },
+ {
+  "t": 20.0,
+  "text": "Heart rate 86. Blood pressure 128 over 78. Oxygen 98."
+ },
+ {
+  "t": 22.8,
+  "text": "Hemostat on the field. Two clamps."
+ },
+ {
+  "t": 25.2,
+  "text": "Suction please."
+ },
+ {
+  "t": 27.4,
+  "text": "Needle driver loaded. One needle."
+ },
+ {
+  "t": 29.8,
+  "text": "Stitch is complete."
+ },
+ {
+  "t": 32.2,
+  "text": "Needle is back on the tray."
+ },
+ {
+  "t": 34.4,
+  "text": "Hemostat replaced on the tray."
+ },
+ {
+  "t": 36.8,
+  "text": "Specimen is out. Irrigation is clear."
+ },
+ {
+  "t": 39.4,
+  "text": "Heart rate 76. Blood pressure 114 over 70. Oxygen 99."
+ },
+ {
+  "t": 42.0,
+  "text": "Sponge out."
+ },
+ {
+  "t": 44.2,
+  "text": "Sponge out."
+ },
+ {
+  "t": 46.4,
+  "text": "Sponge out."
+ },
+ {
+  "t": 48.6,
+  "text": "Sponge out."
+ },
+ {
+  "t": 50.8,
+  "text": "Sponge out."
+ },
+ {
+  "t": 53.0,
+  "text": "Sponge out."
+ },
+ {
+  "t": 55.2,
+  "text": "Sponge out."
+ },
+ {
+  "t": 57.4,
+  "text": "Sponge out."
+ },
+ {
+  "t": 59.6,
+  "text": "Sponge out."
+ },
+ {
+  "t": 61.8,
+  "text": "Counts are correct."
+ },
+ {
+  "t": 64.4,
+  "text": "Okay, let's close."
+ }
+]

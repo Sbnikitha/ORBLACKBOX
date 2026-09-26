@@ -1,0 +1,5 @@
+scenario,clip,hidden_problem,expected_status
+normal,or1,no,SAFE
+spoken_mismatch,or2,no,BLOCK
+skipped_timeout,or3,no,CAUTION
+hidden_tray_problem,or1,yes,BLOCK

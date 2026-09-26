@@ -1,0 +1,28 @@
+{
+  "device": "cuda",
+  "counter": {
+    "exact": 25,
+    "n": 32,
+    "mae": 0.219
+  },
+  "tool": {
+    "iou": 0.567,
+    "n_train": 501,
+    "n_test": 89,
+    "samples": [
+      "ckcui3f5s00073b5yhoy4j2fl.jpg",
+      "ckd4kci5x000d3b5y6ywvphuf.jpg",
+      "ckcu9sikm000g3b5y1yd89b1g.jpg",
+      "ckcxcivho00033b5yc1wql9t7.jpg",
+      "ckczzndii000c3b5ytec6knrr.jpg",
+      "ckcude7ho000o3b5ytoe12oms.jpg",
+      "ckcuazqgy00073b5y8kg82iqm.jpg",
+      "ckcu8xad600033b5yc78xfyjx.jpg"
+    ]
+  },
+  "gated": [
+    "MM-OR, 4D-OR, and MVOR need an author form",
+    "Cholec80, CholecT50, and EndoVis need a request form",
+    "FSC-147 full images were not downloaded; they are a multi-gigabyte Drive archive"
+  ]
+}
