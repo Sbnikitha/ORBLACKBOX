@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # OR Sentinel
 
 Live surgical sponge-count interlock for a circulating nurse. One station watches up to eight operating rooms. Speech tracks sponges and the WHO checklist. A camera counts the tray. Fixed rules block closing when the count is wrong. Patient details stay on the box unless a question is non-urgent, the local model is unsure, the link is up, and a second check finds nothing identifiable left.
@@ -45,5 +46,3 @@ The demo does not download these. They are the next training and pitch sources.
 | Cholec80, CholecT50, EndoVis, Kvasir-Instrument | Instrument recognition later; several need a request form |
 | Synthea | Fake charts for the privacy stripper |
 | Freesound | Monitor beeps under the acted audio, after a license check |
-
-# ORBLACKBOX
