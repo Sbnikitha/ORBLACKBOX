@@ -1,25 +1,30 @@
 """Train later: HOSPI instruments only.
 
-Unzip OR_Sentinel_datasets.zip and run this from that folder:
-
     pip install ultralytics
-    python later_hospi.py
+    python nano/later_hospi.py
+
+Uses data/external/hospi/HOSPI_Tools_small_yolov5/images/train
+and the matching labels/train folder.
 """
 import argparse
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import yolo_layout
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data", default="hospi_yolo/data.yaml")
+    parser.add_argument("--data", default="")
     parser.add_argument("--model", default="yolov8s.pt")
     parser.add_argument("--epochs", type=int, default=40)
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--batch", type=int, default=16)
     args = parser.parse_args()
-    data = Path(args.data)
+    data = Path(args.data) if args.data else yolo_layout.hospi_yaml()
     if not data.is_file():
-        raise SystemExit(f"Missing {data}. Unzip the bundle and run this script from that folder.")
+        raise SystemExit(f"Missing {data}")
     from ultralytics import YOLO
 
     YOLO(args.model).train(

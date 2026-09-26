@@ -1,15 +1,20 @@
-"""Train on the Nano now: sponges on top of instruments.
+"""Train on the real combined trays: sponges on top of instruments.
 
-Unzip OR_Sentinel_datasets.zip and run this from that folder:
+From the project folder:
 
     pip install ultralytics
-    python nano_train.py
+    python nano/nano_train.py
 
-That uses combined_new, the set where gauze covers the tools.
-Pass --previous to train the earlier combined set instead.
+The photos are in data/composites_real/train (jpg + json). This script
+builds data/yolo/combined_new/train/images and train/labels, then trains.
+Pass --previous for data/composites_previous.
 """
 import argparse
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import yolo_layout
 
 
 def main():
@@ -20,9 +25,7 @@ def main():
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--batch", type=int, default=16)
     args = parser.parse_args()
-    data = Path("combined_previous/data.yaml" if args.previous else "combined_new/data.yaml")
-    if not data.is_file():
-        raise SystemExit(f"Missing {data}. Unzip the bundle and run this script from that folder.")
+    data = yolo_layout.combined_yaml(previous=args.previous)
     from ultralytics import YOLO
 
     YOLO(args.model).train(

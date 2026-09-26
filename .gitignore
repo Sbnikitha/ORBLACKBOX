@@ -17,4 +17,6 @@ data/composites/
 data/composites_real/
 data/composites_previous/
 data/composites_preview/
+data/yolo/
+data/realistic/
 data/*.zip
